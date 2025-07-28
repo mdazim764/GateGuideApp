@@ -118,3 +118,9 @@ apply from: "../../node_modules/react-native-vector-icons/fonts.gradle"
         implementation jscFlavor
     }
 }
+
+project.ext.react = [
+    // Add these lines:
+    disableReanimated: true,
+    disableWorklets: true
+]

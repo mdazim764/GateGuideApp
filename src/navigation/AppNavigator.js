@@ -18,7 +18,7 @@ const Stack = createStackNavigator();
 
 // Stack navigators for each tab
 const HomeStack = () => (
-  <Stack.Navigator>
+  <Stack.Navigator options={{ headerShown: false }}>
     <Stack.Screen
       name="Home"
       component={HomeScreen}
@@ -29,13 +29,21 @@ const HomeStack = () => (
 
 const PlannerStack = () => (
   <Stack.Navigator>
-    <Stack.Screen name="Planner" component={PlannerScreen} />
+    <Stack.Screen
+      name="Planner"
+      component={PlannerScreen}
+      options={{ headerShown: false }}
+    />
   </Stack.Navigator>
 );
 
 const ResourcesStack = () => (
   <Stack.Navigator>
-    <Stack.Screen name="Resources" component={ResourcesScreen} />
+    <Stack.Screen
+      name="Resources"
+      component={ResourcesScreen}
+      options={{ headerShown: false }}
+    />
   </Stack.Navigator>
 );
 
