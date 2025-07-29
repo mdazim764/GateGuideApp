@@ -375,8 +375,11 @@ const ResourcesScreen = ({ navigation }) => {
             >
               <ImageBackground
                 source={getSubjectBackgroundImage(subject.id)}
-                style={styles.subjectBackground}
-                imageStyle={{ opacity: 0.45 }}
+                style={[
+                  styles.subjectBackground,
+                  { backgroundColor: theme.card },
+                ]}
+                imageStyle={{ opacity: 0.35 }}
                 resizeMode="cover"
               >
                 <View
@@ -386,7 +389,7 @@ const ResourcesScreen = ({ navigation }) => {
                       backgroundColor:
                         activeSubject === subject.id
                           ? theme.primary
-                          : `${theme.primary}20`,
+                          : `${theme.primary}50`,
                     },
                   ]}
                 >
@@ -396,7 +399,7 @@ const ResourcesScreen = ({ navigation }) => {
                       {
                         color:
                           activeSubject === subject.id
-                            ? '#FFFFFF'
+                            ? '#454242ff'
                             : theme.primary,
                       },
                     ]}
@@ -704,7 +707,7 @@ const styles = StyleSheet.create({
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#302f2fff',
     // padding: 4,
   },
 });
