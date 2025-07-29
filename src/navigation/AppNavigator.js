@@ -49,19 +49,31 @@ const ResourcesStack = () => (
 
 const TrackerStack = () => (
   <Stack.Navigator>
-    <Stack.Screen name="Tracker" component={TrackerScreen} />
+    <Stack.Screen
+      name="Tracker"
+      component={TrackerScreen}
+      options={{ headerShown: false }}
+    />
   </Stack.Navigator>
 );
 
 const QuotesStack = () => (
   <Stack.Navigator>
-    <Stack.Screen name="Quotes" component={QuotesScreen} />
+    <Stack.Screen
+      name="Quotes"
+      component={QuotesScreen}
+      options={{ headerShown: false }}
+    />
   </Stack.Navigator>
 );
 
 const SettingsStack = () => (
   <Stack.Navigator>
-    <Stack.Screen name="Settings" component={SettingsScreen} />
+    <Stack.Screen
+      name="Settings"
+      component={SettingsScreen}
+      options={{ headerShown: false }}
+    />
   </Stack.Navigator>
 );
 
