@@ -230,7 +230,7 @@ const HomeScreen = () => {
     // Set component as mounted after a short delay
     const timer = setTimeout(() => {
       setIsMounted(true);
-      setIsComponentMounted(true); // Your existing state
+      setIsComponentMounted(true);
     }, 100);
 
     return () => clearTimeout(timer);

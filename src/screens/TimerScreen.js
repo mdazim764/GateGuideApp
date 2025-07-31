@@ -15,20 +15,20 @@ const { width } = Dimensions.get('window');
 
 const TimerScreen = () => {
   const { theme } = useContext(ThemeContext);
-  
+
   const [timerMode, setTimerMode] = useState('focus'); // focus, shortBreak, longBreak
   const [isRunning, setIsRunning] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState(25 * 60); // 25 minutes in seconds
   const [completedSessions, setCompletedSessions] = useState(0);
   const [selectedSubject, setSelectedSubject] = useState('Operating Systems');
-  
+
   // Timer modes in seconds
   const timerModes = {
     focus: 25 * 60,
     shortBreak: 5 * 60,
     longBreak: 15 * 60,
   };
-  
+
   // Subject options
   const subjects = [
     'Operating Systems',
@@ -38,10 +38,10 @@ const TimerScreen = () => {
     'Database Management',
     'Digital Logic',
   ];
-  
+
   useEffect(() => {
     let timer;
-    
+
     if (isRunning && timeRemaining > 0) {
       timer = setTimeout(() => {
         setTimeRemaining(timeRemaining - 1);
@@ -49,19 +49,19 @@ const TimerScreen = () => {
     } else if (isRunning && timeRemaining === 0) {
       handleTimerComplete();
     }
-    
+
     return () => {
       clearTimeout(timer);
     };
   }, [isRunning, timeRemaining]);
-  
+
   const handleTimerComplete = () => {
     // Play sound or vibration here
-    
+
     if (timerMode === 'focus') {
       const newCompletedSessions = completedSessions + 1;
       setCompletedSessions(newCompletedSessions);
-      
+
       // After 4 focus sessions, take a long break
       if (newCompletedSessions % 4 === 0) {
         switchMode('longBreak');
@@ -73,107 +73,143 @@ const TimerScreen = () => {
       switchMode('focus');
     }
   };
-  
-  const switchMode = (mode) => {
+
+  const switchMode = mode => {
     setTimerMode(mode);
     setTimeRemaining(timerModes[mode]);
     setIsRunning(false);
   };
-  
+
   const toggleTimer = () => {
     setIsRunning(!isRunning);
   };
-  
+
   const resetTimer = () => {
     setTimeRemaining(timerModes[timerMode]);
     setIsRunning(false);
   };
-  
-  const formatTime = (seconds) => {
+
+  const formatTime = seconds => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    return `${mins.toString().padStart(2, '0')}:${secs
+      .toString()
+      .padStart(2, '0')}`;
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'right', 'left']}>
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollViewContent}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+      edges={['top', 'right', 'left']}
+    >
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollViewContent}
+      >
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>Focus Timer</Text>
           <Text style={[styles.subtitle, { color: theme.text }]}>
             {completedSessions} sessions completed today
           </Text>
         </View>
-        
-        <View style={styles.modeSelector}>
+
+        <View style={[styles.modeSelector, { backgroundColor: theme.card }]}>
           <TouchableOpacity
             style={[
               styles.modeButton,
-              timerMode === 'focus' && [styles.activeModeButton, { backgroundColor: theme.primary }]
+              timerMode === 'focus' && [
+                styles.activeModeButton,
+                { backgroundColor: theme.primary },
+              ],
             ]}
             onPress={() => switchMode('focus')}
           >
-            <Text style={[
-              styles.modeButtonText, 
-              { color: timerMode === 'focus' ? '#FFFFFF' : theme.text }
-            ]}>
+            <Text
+              style={[
+                styles.modeButtonText,
+                { color: timerMode === 'focus' ? '#FFFFFF' : theme.text },
+              ]}
+            >
               Focus
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.modeButton,
-              timerMode === 'shortBreak' && [styles.activeModeButton, { backgroundColor: theme.primary }]
+              timerMode === 'shortBreak' && [
+                styles.activeModeButton,
+                { backgroundColor: theme.primary },
+              ],
             ]}
             onPress={() => switchMode('shortBreak')}
           >
-            <Text style={[
-              styles.modeButtonText, 
-              { color: timerMode === 'shortBreak' ? '#FFFFFF' : theme.text }
-            ]}>
+            <Text
+              style={[
+                styles.modeButtonText,
+                { color: timerMode === 'shortBreak' ? '#FFFFFF' : theme.text },
+              ]}
+            >
               Short Break
             </Text>
           </TouchableOpacity>
-          
+
           <TouchableOpacity
             style={[
               styles.modeButton,
-              timerMode === 'longBreak' && [styles.activeModeButton, { backgroundColor: theme.primary }]
+              timerMode === 'longBreak' && [
+                styles.activeModeButton,
+                { backgroundColor: theme.primary },
+              ],
             ]}
             onPress={() => switchMode('longBreak')}
           >
-            <Text style={[
-              styles.modeButtonText, 
-              { color: timerMode === 'longBreak' ? '#FFFFFF' : theme.text }
-            ]}>
+            <Text
+              style={[
+                styles.modeButtonText,
+                { color: timerMode === 'longBreak' ? '#FFFFFF' : theme.text },
+              ]}
+            >
               Long Break
             </Text>
           </TouchableOpacity>
         </View>
-        
+
         <View style={[styles.timerContainer, { backgroundColor: theme.card }]}>
           <Text style={[styles.timerText, { color: theme.text }]}>
             {formatTime(timeRemaining)}
           </Text>
-          
+
           <View style={styles.timerActions}>
             <TouchableOpacity
-              style={[styles.timerButton, { backgroundColor: `${theme.primary}20` }]}
+              style={[
+                styles.timerButton,
+                { backgroundColor: `${theme.primary}20` },
+              ]}
               onPress={resetTimer}
             >
               <Icon name="refresh" size={24} color={theme.primary} />
             </TouchableOpacity>
-            
+
             <TouchableOpacity
-              style={[styles.timerMainButton, { backgroundColor: theme.primary }]}
+              style={[
+                styles.timerMainButton,
+                { backgroundColor: theme.primary },
+              ]}
               onPress={toggleTimer}
             >
-              <Icon name={isRunning ? 'pause' : 'play'} size={32} color="#FFFFFF" />
+              <Icon
+                name={isRunning ? 'pause' : 'play'}
+                size={32}
+                color="#FFFFFF"
+              />
             </TouchableOpacity>
-            
+
             <TouchableOpacity
-              style={[styles.timerButton, { backgroundColor: `${theme.primary}20` }]}
+              style={[
+                styles.timerButton,
+                { backgroundColor: `${theme.primary}20` },
+              ]}
               onPress={() => {
                 // Skip to next mode
                 if (timerMode === 'focus') {
@@ -187,10 +223,12 @@ const TimerScreen = () => {
             </TouchableOpacity>
           </View>
         </View>
-        
+
         <View style={styles.subjectSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>What are you studying?</Text>
-          
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            What are you studying?
+          </Text>
+
           <View style={styles.subjectOptions}>
             {subjects.map(subject => (
               <TouchableOpacity
@@ -198,45 +236,62 @@ const TimerScreen = () => {
                 style={[
                   styles.subjectButton,
                   { backgroundColor: theme.card },
-                  selectedSubject === subject && { 
+                  selectedSubject === subject && {
                     backgroundColor: `${theme.primary}20`,
                     borderColor: theme.primary,
                     borderWidth: 1,
-                  }
+                  },
                 ]}
                 onPress={() => setSelectedSubject(subject)}
               >
-                <Text style={[
-                  styles.subjectButtonText, 
-                  { color: theme.text },
-                  selectedSubject === subject && { color: theme.primary }
-                ]}>
+                <Text
+                  style={[
+                    styles.subjectButtonText,
+                    { color: theme.text },
+                    selectedSubject === subject && { color: theme.primary },
+                  ]}
+                >
                   {subject}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
         </View>
-        
+
         <View style={styles.statsSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Today's Stats</Text>
-          
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Today's Stats
+          </Text>
+
           <View style={[styles.statsCard, { backgroundColor: theme.card }]}>
             <View style={styles.statItem}>
               <Icon name="clock-outline" size={24} color={theme.primary} />
               <View style={styles.statContent}>
-                <Text style={[styles.statValue, { color: theme.text }]}>01:15:00</Text>
-                <Text style={[styles.statLabel, { color: theme.text }]}>Focus Time</Text>
+                <Text style={[styles.statValue, { color: theme.text }]}>
+                  01:15:00
+                </Text>
+                <Text style={[styles.statLabel, { color: theme.text }]}>
+                  Focus Time
+                </Text>
               </View>
             </View>
-            
-            <View style={[styles.statDivider, { backgroundColor: `${theme.text}20` }]} />
-            
+
+            <View
+              style={[
+                styles.statDivider,
+                { backgroundColor: `${theme.text}20` },
+              ]}
+            />
+
             <View style={styles.statItem}>
               <Icon name="check-circle" size={24} color={theme.primary} />
               <View style={styles.statContent}>
-                <Text style={[styles.statValue, { color: theme.text }]}>{completedSessions}</Text>
-                <Text style={[styles.statLabel, { color: theme.text }]}>Sessions</Text>
+                <Text style={[styles.statValue, { color: theme.text }]}>
+                  {completedSessions}
+                </Text>
+                <Text style={[styles.statLabel, { color: theme.text }]}>
+                  Sessions
+                </Text>
               </View>
             </View>
           </View>

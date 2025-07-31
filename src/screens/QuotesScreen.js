@@ -15,7 +15,8 @@ import { useApp } from '../context/AppContext';
 
 const QuotesScreen = () => {
   const { theme } = useContext(ThemeContext);
-  const { currentQuote, setRandomQuoteOfDay } = useApp();
+  const appContext = useApp() || {};
+  const { currentQuote, setRandomQuoteOfDay } = appContext;
   const [fadeAnim] = useState(new Animated.Value(1));
 
   const styles = StyleSheet.create({
