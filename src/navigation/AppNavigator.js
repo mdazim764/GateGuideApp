@@ -1,176 +1,78 @@
 import React, { useContext } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import Icon from 'react-native-vector-icons/Ionicons';
 import { ThemeContext } from '../theme/ThemeContext';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
-import PlannerScreen from '../screens/PlannerScreen';
+import SyllabusScreen from '../screens/SyllabusScreen';
 import ResourcesScreen from '../screens/ResourcesScreen';
-import TrackerScreen from '../screens/TrackerScreen';
+import TimerScreen from '../screens/TimerScreen';
+import MoreScreen from '../screens/MoreScreen';
+import PlannerScreen from '../screens/PlannerScreen';
 import QuotesScreen from '../screens/QuotesScreen';
+import TrackerScreen from '../screens/TrackerScreen';
+import AiGuideScreen from '../screens/AiGuideScreen';
+import SubjectDetailScreen from '../screens/SubjectDetailScreen';
+import QuizScreen from '../screens/QuizScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import AnalyticsScreen from '../screens/AnalyticsScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-// Stack navigators for each tab
-const HomeStack = () => (
-  <Stack.Navigator options={{ headerShown: false }}>
-    <Stack.Screen
-      name="Home"
-      component={HomeScreen}
-      options={{ headerShown: false }}
-    />
-  </Stack.Navigator>
-);
-
-const PlannerStack = () => (
-  <Stack.Navigator>
-    <Stack.Screen
-      name="Planner"
-      component={PlannerScreen}
-      options={{ headerShown: false }}
-    />
-  </Stack.Navigator>
-);
-
-const ResourcesStack = () => (
-  <Stack.Navigator>
-    <Stack.Screen
-      name="Resources"
-      component={ResourcesScreen}
-      options={{ headerShown: false }}
-    />
-  </Stack.Navigator>
-);
-
-const TrackerStack = () => (
-  <Stack.Navigator>
-    <Stack.Screen
-      name="Tracker"
-      component={TrackerScreen}
-      options={{ headerShown: false }}
-    />
-  </Stack.Navigator>
-);
-
-const QuotesStack = () => (
-  <Stack.Navigator>
-    <Stack.Screen
-      name="Quotes"
-      component={QuotesScreen}
-      options={{ headerShown: false }}
-    />
-  </Stack.Navigator>
-);
-
-const SettingsStack = () => (
-  <Stack.Navigator>
-    <Stack.Screen
-      name="Settings"
-      component={SettingsScreen}
-      options={{ headerShown: false }}
-    />
-  </Stack.Navigator>
-);
-
-// Tab navigator
-const AppNavigator = () => {
-  const { theme, isDarkMode } = useContext(ThemeContext);
-
+const MoreStack = () => {
+  const { theme } = useContext(ThemeContext);
   return (
-    <NavigationContainer
-      theme={{
-        dark: isDarkMode,
-        colors: {
-          primary: theme.primary,
-          background: theme.background,
-          card: theme.card,
-          text: theme.text,
-          border: theme.card,
-          notification: theme.primary,
-        },
-        fonts: {
-          regular: {
-            fontFamily: undefined,
-            fontWeight: 'normal',
-          },
-          medium: {
-            fontFamily: undefined,
-            fontWeight: '500',
-          },
-          light: {
-            fontFamily: undefined,
-            fontWeight: '300',
-          },
-          thin: {
-            fontFamily: undefined,
-            fontWeight: '100',
-          },
-        },
+    <Stack.Navigator
+      screenOptions={{
+        headerStyle: { backgroundColor: theme.card },
+        headerTintColor: theme.text,
       }}
     >
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            let iconName;
+      <Stack.Screen name="MoreMenu" component={MoreScreen} options={{ title: 'More Options' }} />
+      <Stack.Screen name="Planner" component={PlannerScreen} />
+      <Stack.Screen name="Quotes" component={QuotesScreen} />
+      <Stack.Screen name="Tracker" component={TrackerScreen} />
+      <Stack.Screen name="AiGuide" component={AiGuideScreen} options={{ title: 'AI Guide' }} />
+      <Stack.Screen name="Syllabus" component={SyllabusScreen} />
+      <Stack.Screen name="Timer" component={TimerScreen} />
+      <Stack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
+      <Stack.Screen name="Quiz" component={QuizScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="Analytics" component={AnalyticsScreen} />
+      <Stack.Screen name="Resources" component={ResourcesScreen} />
+    </Stack.Navigator>
+  );
+};
 
-            if (route.name === 'HomeTab') {
-              iconName = 'home';
-            } else if (route.name === 'PlannerTab') {
-              iconName = 'calendar-check';
-            } else if (route.name === 'ResourcesTab') {
-              iconName = 'book-open-page-variant';
-            } else if (route.name === 'TrackerTab') {
-              iconName = 'chart-line';
-            } else if (route.name === 'QuotesTab') {
-              iconName = 'format-quote-close';
-            } else if (route.name === 'SettingsTab') {
-              iconName = 'cog';
-            }
-
-            return <Icon name={iconName} size={size} color={color} />;
-          },
-          tabBarActiveTintColor: theme.tabIconFocused,
-          tabBarInactiveTintColor: theme.tabIcon,
-          tabBarStyle: { backgroundColor: theme.tabBar },
-        })}
-      >
-        <Tab.Screen
-          name="HomeTab"
-          component={HomeStack}
-          options={{ tabBarLabel: 'Home', headerShown: false }}
-        />
-        <Tab.Screen
-          name="PlannerTab"
-          component={PlannerStack}
-          options={{ tabBarLabel: 'Planner', headerShown: false }}
-        />
-        <Tab.Screen
-          name="ResourcesTab"
-          component={ResourcesStack}
-          options={{ tabBarLabel: 'Resources', headerShown: false }}
-        />
-        <Tab.Screen
-          name="TrackerTab"
-          component={TrackerStack}
-          options={{ tabBarLabel: 'Tracker', headerShown: false }}
-        />
-        <Tab.Screen
-          name="QuotesTab"
-          component={QuotesStack}
-          options={{ tabBarLabel: 'Quotes', headerShown: false }}
-        />
-        <Tab.Screen
-          name="SettingsTab"
-          component={SettingsStack}
-          options={{ tabBarLabel: 'Settings', headerShown: false }}
-        />
-      </Tab.Navigator>
-    </NavigationContainer>
+const AppNavigator = () => {
+  const { theme } = useContext(ThemeContext);
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
+          else if (route.name === 'Syllabus') iconName = focused ? 'list' : 'list-outline';
+          else if (route.name === 'Resources') iconName = focused ? 'play-circle' : 'play-circle-outline';
+          else if (route.name === 'Timer') iconName = focused ? 'time' : 'time-outline';
+          else if (route.name === 'More') iconName = focused ? 'menu' : 'menu-outline';
+          return <Icon name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: theme.tabIconFocused,
+        tabBarInactiveTintColor: theme.tabIcon,
+        tabBarStyle: { backgroundColor: theme.tabBar },
+      })}
+    >
+      <Tab.Screen name="Home" component={HomeScreen} />
+      <Tab.Screen name="Syllabus" component={SyllabusScreen} />
+      <Tab.Screen name="Resources" component={ResourcesScreen} />
+      <Tab.Screen name="Timer" component={TimerScreen} />
+      <Tab.Screen name="More" component={MoreStack} />
+    </Tab.Navigator>
   );
 };
 

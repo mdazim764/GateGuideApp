@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   },
   barLabelContainer: {
     position: 'absolute',
-    bottom: 100%,
+    bottom: '100%', // correct
     alignItems: 'center',
   },
   barValue: {
@@ -453,14 +453,14 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   barBackground: {
-    width: 100%,
-    height: 100%,
+    width: '100%', // correct
+    height: '100%', // correct
     borderRadius: 4,
     backgroundColor: '#f0f0f0',
     overflow: 'hidden',
   },
   barFill: {
-    width: 100%,
+    width: '100%', // correct
     borderRadius: 4,
     position: 'absolute',
     bottom: 0,
@@ -502,13 +502,13 @@ const styles = StyleSheet.create({
   subjectPercentageBar: {
     height: 8,
     borderRadius: 4,
-    width: 100%,
+    width: '100%', // correct
     backgroundColor: '#e0e0e0',
     overflow: 'hidden',
     marginRight: 8,
   },
   subjectPercentageFill: {
-    height: 100%,
+    height: '100%', // correct
     borderRadius: 4,
     position: 'absolute',
     top: 0,
