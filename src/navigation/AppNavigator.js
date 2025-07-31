@@ -27,15 +27,14 @@ const MoreStack = () => {
   return (
     <Stack.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: theme.card },
-        headerTintColor: theme.text,
+        headerShown: false, // <-- Hide system header for all screens
       }}
     >
-      <Stack.Screen name="MoreMenu" component={MoreScreen} options={{ title: 'More Options' }} />
+      <Stack.Screen name="MoreMenu" component={MoreScreen} />
       <Stack.Screen name="Planner" component={PlannerScreen} />
       <Stack.Screen name="Quotes" component={QuotesScreen} />
       <Stack.Screen name="Tracker" component={TrackerScreen} />
-      <Stack.Screen name="AiGuide" component={AiGuideScreen} options={{ title: 'AI Guide' }} />
+      <Stack.Screen name="AiGuide" component={AiGuideScreen} />
       <Stack.Screen name="Syllabus" component={SyllabusScreen} />
       <Stack.Screen name="Timer" component={TimerScreen} />
       <Stack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
@@ -55,11 +54,16 @@ const AppNavigator = () => {
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-          if (route.name === 'Home') iconName = focused ? 'home' : 'home-outline';
-          else if (route.name === 'Syllabus') iconName = focused ? 'list' : 'list-outline';
-          else if (route.name === 'Resources') iconName = focused ? 'play-circle' : 'play-circle-outline';
-          else if (route.name === 'Timer') iconName = focused ? 'time' : 'time-outline';
-          else if (route.name === 'More') iconName = focused ? 'menu' : 'menu-outline';
+          if (route.name === 'Home')
+            iconName = focused ? 'home' : 'home-outline';
+          else if (route.name === 'Syllabus')
+            iconName = focused ? 'list' : 'list-outline';
+          else if (route.name === 'Resources')
+            iconName = focused ? 'play-circle' : 'play-circle-outline';
+          else if (route.name === 'Timer')
+            iconName = focused ? 'time' : 'time-outline';
+          else if (route.name === 'More')
+            iconName = focused ? 'menu' : 'menu-outline';
           return <Icon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: theme.tabIconFocused,

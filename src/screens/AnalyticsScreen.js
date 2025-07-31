@@ -10,27 +10,27 @@ import {
 } from 'react-native';
 import { ThemeContext } from '../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import CustomHeader from '../components/CustomHeader';
 
 const { width } = Dimensions.get('window');
 
-// Simple chart bar component
+// Chart bar component
 const ChartBar = ({ value, maxValue, label, color, theme }) => {
   const percentage = (value / maxValue) * 100;
-  
   return (
     <View style={styles.chartBarContainer}>
       <View style={styles.barLabelContainer}>
         <Text style={[styles.barValue, { color: theme.text }]}>{value}</Text>
       </View>
       <View style={[styles.barBackground, { backgroundColor: `${color}30` }]}>
-        <View 
+        <View
           style={[
-            styles.barFill, 
-            { 
+            styles.barFill,
+            {
               backgroundColor: color,
-              height: `${percentage}%` 
-            }
-          ]} 
+              height: `${percentage}%`,
+            },
+          ]}
         />
       </View>
       <Text style={[styles.barLabel, { color: theme.text }]}>{label}</Text>
@@ -41,7 +41,7 @@ const ChartBar = ({ value, maxValue, label, color, theme }) => {
 const AnalyticsScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
   const [selectedTimeframe, setSelectedTimeframe] = useState('week'); // 'week', 'month', 'year'
-  
+
   // Mock data
   const studyData = {
     week: {
@@ -113,111 +113,107 @@ const AnalyticsScreen = ({ navigation }) => {
       ],
     },
   };
-  
+
   const data = studyData[selectedTimeframe];
   const maxStudyHours = Math.max(...data.dailyStudy.map(item => item.hours));
-  
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Icon name="arrow-left" size={24} color={theme.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.text }]}>Analytics</Text>
-        <TouchableOpacity>
-          <Icon name="export-variant" size={24} color={theme.text} />
-        </TouchableOpacity>
-      </View>
-      
-      <ScrollView 
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
+      <CustomHeader
+        title="Analytics"
+        onBack={() => navigation.goBack()}
+        // rightIcon="export-variant"
+        // onRightPress={() => {}}
+      />
+      <ScrollView
         style={styles.scrollView}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.timeframeSelector}>
-          <TouchableOpacity
-            style={[
-              styles.timeframeButton,
-              selectedTimeframe === 'week' && { backgroundColor: `${theme.primary}20` }
-            ]}
-            onPress={() => setSelectedTimeframe('week')}
-          >
-            <Text
+        {/* Timeframe Selector */}
+        <View
+          style={[styles.timeframeSelector, { backgroundColor: theme.card }]}
+        >
+          {['week', 'month', 'year'].map(tf => (
+            <TouchableOpacity
+              key={tf}
               style={[
-                styles.timeframeText,
-                { color: selectedTimeframe === 'week' ? theme.primary : theme.text }
+                styles.timeframeButton,
+                selectedTimeframe === tf && {
+                  backgroundColor: `${theme.primary}20`,
+                },
               ]}
+              onPress={() => setSelectedTimeframe(tf)}
             >
-              Week
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.timeframeButton,
-              selectedTimeframe === 'month' && { backgroundColor: `${theme.primary}20` }
-            ]}
-            onPress={() => setSelectedTimeframe('month')}
-          >
-            <Text
-              style={[
-                styles.timeframeText,
-                { color: selectedTimeframe === 'month' ? theme.primary : theme.text }
-              ]}
-            >
-              Month
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.timeframeButton,
-              selectedTimeframe === 'year' && { backgroundColor: `${theme.primary}20` }
-            ]}
-            onPress={() => setSelectedTimeframe('year')}
-          >
-            <Text
-              style={[
-                styles.timeframeText,
-                { color: selectedTimeframe === 'year' ? theme.primary : theme.text }
-              ]}
-            >
-              Year
-            </Text>
-          </TouchableOpacity>
+              <Text
+                style={[
+                  styles.timeframeText,
+                  {
+                    color:
+                      selectedTimeframe === tf ? theme.primary : theme.text,
+                  },
+                ]}
+              >
+                {tf.charAt(0).toUpperCase() + tf.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
-        
+
+        {/* Stats Grid */}
         <View style={styles.statsGrid}>
           <View style={[styles.statCard, { backgroundColor: theme.card }]}>
-            <View style={[styles.statIconBox, { backgroundColor: `${theme.primary}20` }]}>
+            <View
+              style={[
+                styles.statIconBox,
+                { backgroundColor: `${theme.primary}20` },
+              ]}
+            >
               <Icon name="clock-outline" size={24} color={theme.primary} />
             </View>
             <Text style={styles.statValue}>{data.totalHours}</Text>
             <Text style={styles.statLabel}>Hours Studied</Text>
           </View>
-          
           <View style={[styles.statCard, { backgroundColor: theme.card }]}>
-            <View style={[styles.statIconBox, { backgroundColor: `${theme.primary}20` }]}>
+            <View
+              style={[
+                styles.statIconBox,
+                { backgroundColor: `${theme.primary}20` },
+              ]}
+            >
               <Icon name="calendar-check" size={24} color={theme.primary} />
             </View>
             <Text style={styles.statValue}>{data.daysActive}</Text>
             <Text style={styles.statLabel}>Days Active</Text>
           </View>
-          
           <View style={[styles.statCard, { backgroundColor: theme.card }]}>
-            <View style={[styles.statIconBox, { backgroundColor: `${theme.primary}20` }]}>
+            <View
+              style={[
+                styles.statIconBox,
+                { backgroundColor: `${theme.primary}20` },
+              ]}
+            >
               <Icon name="notebook-check" size={24} color={theme.primary} />
             </View>
             <Text style={styles.statValue}>{data.quizzesTaken}</Text>
             <Text style={styles.statLabel}>Quizzes Taken</Text>
           </View>
-          
           <View style={[styles.statCard, { backgroundColor: theme.card }]}>
-            <View style={[styles.statIconBox, { backgroundColor: `${theme.primary}20` }]}>
+            <View
+              style={[
+                styles.statIconBox,
+                { backgroundColor: `${theme.primary}20` },
+              ]}
+            >
               <Icon name="percent" size={24} color={theme.primary} />
             </View>
             <Text style={styles.statValue}>{data.averageScore}%</Text>
             <Text style={styles.statLabel}>Average Score</Text>
           </View>
         </View>
-        
+
+        {/* Study Time Distribution */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -227,8 +223,9 @@ const AnalyticsScreen = ({ navigation }) => {
               <Text style={{ color: theme.primary }}>Details</Text>
             </TouchableOpacity>
           </View>
-          
-          <View style={[styles.chartContainer, { backgroundColor: theme.card }]}>
+          <View
+            style={[styles.chartContainer, { backgroundColor: theme.card }]}
+          >
             <View style={styles.barChart}>
               {data.dailyStudy.map((item, index) => (
                 <ChartBar
@@ -243,7 +240,8 @@ const AnalyticsScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
-        
+
+        {/* Subject Breakdown */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -253,53 +251,59 @@ const AnalyticsScreen = ({ navigation }) => {
               <Text style={{ color: theme.primary }}>Details</Text>
             </TouchableOpacity>
           </View>
-          
-          <View style={[styles.subjectBreakdown, { backgroundColor: theme.card }]}>
+          <View
+            style={[styles.subjectBreakdown, { backgroundColor: theme.card }]}
+          >
             {data.subjectBreakdown.map((item, index) => (
               <View key={index} style={styles.subjectItem}>
                 <View style={styles.subjectInfo}>
-                  <View 
+                  <View
                     style={[
-                      styles.subjectColorDot, 
-                      { 
+                      styles.subjectColorDot,
+                      {
                         backgroundColor: [
-                          theme.primary, 
-                          '#FF9800', 
-                          '#4CAF50', 
-                          '#2196F3', 
-                          '#9C27B0'
-                        ][index % 5] 
-                      }
-                    ]} 
+                          theme.primary,
+                          '#FF9800',
+                          '#4CAF50',
+                          '#2196F3',
+                          '#9C27B0',
+                        ][index % 5],
+                      },
+                    ]}
                   />
                   <Text style={[styles.subjectName, { color: theme.text }]}>
                     {item.subject}
                   </Text>
                 </View>
                 <View style={styles.subjectPercentageContainer}>
-                  <View 
+                  <View
                     style={[
                       styles.subjectPercentageBar,
-                      { backgroundColor: `${theme.primary}20` }
+                      { backgroundColor: `${theme.primary}20` },
                     ]}
                   >
-                    <View 
+                    <View
                       style={[
                         styles.subjectPercentageFill,
-                        { 
+                        {
                           backgroundColor: [
-                            theme.primary, 
-                            '#FF9800', 
-                            '#4CAF50', 
-                            '#2196F3', 
-                            '#9C27B0'
+                            theme.primary,
+                            '#FF9800',
+                            '#4CAF50',
+                            '#2196F3',
+                            '#9C27B0',
                           ][index % 5],
-                          width: `${item.percentage}%`
-                        }
+                          width: `${item.percentage}%`,
+                        },
                       ]}
                     />
                   </View>
-                  <Text style={[styles.subjectPercentageText, { color: theme.text }]}>
+                  <Text
+                    style={[
+                      styles.subjectPercentageText,
+                      { color: theme.text },
+                    ]}
+                  >
                     {item.percentage}%
                   </Text>
                 </View>
@@ -307,7 +311,8 @@ const AnalyticsScreen = ({ navigation }) => {
             ))}
           </View>
         </View>
-        
+
+        {/* Performance Insights */}
         <View style={styles.sectionContainer}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -317,12 +322,14 @@ const AnalyticsScreen = ({ navigation }) => {
               <Text style={{ color: theme.primary }}>All Insights</Text>
             </TouchableOpacity>
           </View>
-          
-          <View style={[styles.insightsContainer, { backgroundColor: theme.card }]}>
+          <View
+            style={[styles.insightsContainer, { backgroundColor: theme.card }]}
+          >
             <View style={styles.insightItem}>
               <Icon name="trending-up" size={24} color="#4CAF50" />
               <Text style={[styles.insightText, { color: theme.text }]}>
-                Your study time increased by 12% compared to last {selectedTimeframe}.
+                Your study time increased by 12% compared to last{' '}
+                {selectedTimeframe}.
               </Text>
             </View>
             <View style={styles.insightItem}>
@@ -339,10 +346,13 @@ const AnalyticsScreen = ({ navigation }) => {
             </View>
           </View>
         </View>
-        
-        <TouchableOpacity 
+
+        {/* Export Button */}
+        <TouchableOpacity
           style={[styles.exportButton, { backgroundColor: theme.primary }]}
-          onPress={() => {/* Export logic */}}
+          onPress={() => {
+            // Export logic here
+          }}
         >
           <Text style={styles.exportButtonText}>Export Data</Text>
         </TouchableOpacity>
@@ -353,6 +363,9 @@ const AnalyticsScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: {
+    flex: 1,
+  },
+  scrollView: {
     flex: 1,
   },
   header: {
@@ -366,23 +379,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  scrollView: {
-    flex: 1,
-  },
   timeframeSelector: {
     flexDirection: 'row',
     justifyContent: 'space-around',
+    marginVertical: 16,
+    marginHorizontal: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
     paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderColor: '#ddd',
   },
   timeframeButton: {
     flex: 1,
     alignItems: 'center',
     paddingVertical: 12,
+    borderRadius: 8,
+    marginHorizontal: 4,
   },
   timeframeText: {
     fontSize: 16,
+    fontWeight: 'bold',
   },
   statsGrid: {
     flexDirection: 'row',
@@ -393,9 +408,10 @@ const styles = StyleSheet.create({
   statCard: {
     width: '48%',
     padding: 16,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
     elevation: 2,
+    alignItems: 'center',
   },
   statIconBox: {
     width: 40,
@@ -422,74 +438,85 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 16,
+    paddingHorizontal: 16,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
   },
   chartContainer: {
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
     elevation: 2,
+    padding: 16,
+    marginHorizontal: 16,
+    backgroundColor: '#fff',
   },
   barChart: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     paddingVertical: 8,
     paddingHorizontal: 4,
+    minHeight: 120,
   },
   chartBarContainer: {
-    width: 30,
+    width: 32,
     alignItems: 'center',
-    marginRight: 8,
+    marginRight: 12,
   },
   barLabelContainer: {
     position: 'absolute',
-    bottom: '100%', // correct
+    bottom: '100%',
     alignItems: 'center',
   },
   barValue: {
     fontSize: 12,
     fontWeight: 'bold',
+    color: '#333',
   },
   barBackground: {
-    width: '100%', // correct
-    height: '100%', // correct
-    borderRadius: 4,
+    width: '100%',
+    height: 80,
+    borderRadius: 6,
     backgroundColor: '#f0f0f0',
     overflow: 'hidden',
+    marginBottom: 4,
   },
   barFill: {
-    width: '100%', // correct
-    borderRadius: 4,
+    width: '100%',
+    borderRadius: 6,
     position: 'absolute',
     bottom: 0,
   },
   barLabel: {
     fontSize: 12,
     marginTop: 4,
+    color: '#333',
   },
   subjectBreakdown: {
     padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    backgroundColor: '#fff',
     elevation: 2,
+    marginHorizontal: 16,
   },
   subjectItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderColor: '#eee',
   },
   subjectInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   subjectColorDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 8,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    marginRight: 10,
   },
   subjectName: {
     fontSize: 16,
@@ -498,17 +525,18 @@ const styles = StyleSheet.create({
   subjectPercentageContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    minWidth: 100,
   },
   subjectPercentageBar: {
     height: 8,
     borderRadius: 4,
-    width: '100%', // correct
+    width: 60,
     backgroundColor: '#e0e0e0',
     overflow: 'hidden',
     marginRight: 8,
   },
   subjectPercentageFill: {
-    height: '100%', // correct
+    height: '100%',
     borderRadius: 4,
     position: 'absolute',
     top: 0,
@@ -516,12 +544,14 @@ const styles = StyleSheet.create({
   subjectPercentageText: {
     fontSize: 14,
     color: '#333',
+    fontWeight: 'bold',
   },
   insightsContainer: {
     padding: 16,
-    borderRadius: 8,
-    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    backgroundColor: '#fff',
     elevation: 2,
+    marginHorizontal: 16,
   },
   insightItem: {
     flexDirection: 'row',
@@ -532,13 +562,15 @@ const styles = StyleSheet.create({
     marginLeft: 8,
     fontSize: 14,
     color: '#333',
+    flex: 1,
   },
   exportButton: {
-    backgroundColor: '#007bff',
-    borderRadius: 4,
-    paddingVertical: 12,
+    borderRadius: 8,
+    paddingVertical: 14,
     alignItems: 'center',
     margin: 16,
+    marginBottom: 32,
+    elevation: 2,
   },
   exportButtonText: {
     color: '#fff',
