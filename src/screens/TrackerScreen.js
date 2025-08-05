@@ -1481,9 +1481,10 @@ const styles = StyleSheet.create({
   topicItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 8,
     padding: 16,
     borderRadius: 8,
-    marginBottom: 8,
+    // marginBottom: 8,
     elevation: 1,
   },
   topicContent: {
