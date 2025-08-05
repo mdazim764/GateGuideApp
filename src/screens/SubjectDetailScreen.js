@@ -43,7 +43,9 @@ const SubjectDetailScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: theme.background }]}
+    >
       <CustomHeader
         title={title || 'Subject Details'}
         onBack={() => navigation.goBack()}
