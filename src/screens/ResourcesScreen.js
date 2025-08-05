@@ -16,11 +16,17 @@ import { ThemeContext } from '../theme/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
-const ResourcesScreen = ({ navigation }) => {
+const ResourcesScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
-  const [activeSubject, setActiveSubject] = useState('All');
-  const [activeResourceType, setActiveResourceType] = useState('All');
-  const [searchQuery, setSearchQuery] = useState('');
+  // Get params if they exist
+  const initialSubject = route.params?.initialSubject || 'All';
+  const initialType = route.params?.initialType || 'All';
+  const initialSearchQuery = route.params?.searchQuery || '';
+
+  // Set initial state with params
+  const [activeSubject, setActiveSubject] = useState(initialSubject);
+  const [activeResourceType, setActiveResourceType] = useState(initialType);
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [resources, setResources] = useState([]);
   const [filteredResources, setFilteredResources] = useState([]);
 

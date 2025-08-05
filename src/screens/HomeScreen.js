@@ -29,7 +29,7 @@ const defaultTheme = {
   card: '#F5F5F5',
 };
 
-const HomeScreen = () => {
+const HomeScreen = ({ navigation }) => {
   // Use try/catch to handle any context errors
   let appContextValues = { isLoading: true };
   let themeContextValues = { theme: defaultTheme };
@@ -730,7 +730,7 @@ const HomeScreen = () => {
               <Text style={[styles.sectionTitle, { color: theme.text }]}>
                 Continue Learning
               </Text>
-              <TouchableOpacity>
+              <TouchableOpacity onPress={() => navigation.navigate('Syllabus')}>
                 <Text style={styles.viewAllText}>View All</Text>
               </TouchableOpacity>
             </View>
@@ -745,7 +745,16 @@ const HomeScreen = () => {
               }}
             >
               {recentlyViewedItems.map(item => (
-                <TouchableOpacity key={item.id} style={styles.recentItem}>
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.recentItem}
+                  onPress={() =>
+                    navigation.navigate('SubjectDetail', {
+                      subjectId: item.id,
+                      title: item.title,
+                    })
+                  }
+                >
                   <Text style={styles.recentItemTitle}>{item.title}</Text>
                   <Text style={styles.recentItemSubtitle}>{item.subtitle}</Text>
 
@@ -782,7 +791,7 @@ const HomeScreen = () => {
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
               Today's Study Plan
             </Text>
-            <TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Planner')}>
               <Text style={styles.viewAllText}>View All</Text>
             </TouchableOpacity>
           </View>
@@ -866,28 +875,40 @@ const HomeScreen = () => {
           </View>
 
           <View style={styles.quickActionsGrid}>
-            <TouchableOpacity style={styles.quickActionItem}>
+            <TouchableOpacity
+              style={styles.quickActionItem}
+              onPress={() => navigation.navigate('Timer')}
+            >
               <View style={styles.quickActionIcon}>
                 <Icon name="play-circle" size={28} color={theme.primary} />
               </View>
               <Text style={styles.quickActionText}>Start Study Session</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem}>
+            <TouchableOpacity
+              style={styles.quickActionItem}
+              onPress={() => navigation.navigate('Quiz')}
+            >
               <View style={styles.quickActionIcon}>
                 <Icon name="file-document" size={28} color={theme.primary} />
               </View>
               <Text style={styles.quickActionText}>Practice Quizzes</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem}>
+            <TouchableOpacity
+              style={styles.quickActionItem}
+              onPress={() => navigation.navigate('Analytics')}
+            >
               <View style={styles.quickActionIcon}>
                 <Icon name="chart-line" size={28} color={theme.primary} />
               </View>
               <Text style={styles.quickActionText}>View Analytics</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.quickActionItem}>
+            <TouchableOpacity
+              style={styles.quickActionItem}
+              onPress={() => navigation.navigate('Resources')}
+            >
               <View style={styles.quickActionIcon}>
                 <Icon
                   name="book-open-variant"

@@ -18,35 +18,15 @@ import SubjectDetailScreen from '../screens/SubjectDetailScreen';
 import QuizScreen from '../screens/QuizScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AnalyticsScreen from '../screens/AnalyticsScreen';
+import LoginScreen from '../screens/auth/LoginScreen';
+import RegisterScreen from '../screens/auth/RegisterScreen';
+import QuizResultScreen from '../screens/QuizResultScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
 
-const MoreStack = () => {
-  const { theme } = useContext(ThemeContext);
-  return (
-    <Stack.Navigator
-      screenOptions={{
-        headerShown: false, // <-- Hide system header for all screens
-      }}
-    >
-      <Stack.Screen name="MoreMenu" component={MoreScreen} />
-      <Stack.Screen name="Planner" component={PlannerScreen} />
-      <Stack.Screen name="Quotes" component={QuotesScreen} />
-      <Stack.Screen name="Tracker" component={TrackerScreen} />
-      <Stack.Screen name="AiGuide" component={AiGuideScreen} />
-      <Stack.Screen name="Syllabus" component={SyllabusScreen} />
-      <Stack.Screen name="Timer" component={TimerScreen} />
-      <Stack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
-      <Stack.Screen name="Quiz" component={QuizScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
-      <Stack.Screen name="Analytics" component={AnalyticsScreen} />
-      <Stack.Screen name="Resources" component={ResourcesScreen} />
-    </Stack.Navigator>
-  );
-};
-
-const AppNavigator = () => {
+// Define MainTabNavigator that was referenced but missing
+const MainTabNavigator = () => {
   const { theme } = useContext(ThemeContext);
   return (
     <Tab.Navigator
@@ -54,15 +34,15 @@ const AppNavigator = () => {
         headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-          if (route.name === 'Home')
+          if (route.name === 'HomeTab')
             iconName = focused ? 'home' : 'home-outline';
-          else if (route.name === 'Syllabus')
+          else if (route.name === 'SyllabusTab')
             iconName = focused ? 'list' : 'list-outline';
-          else if (route.name === 'Resources')
+          else if (route.name === 'ResourcesTab')
             iconName = focused ? 'play-circle' : 'play-circle-outline';
-          else if (route.name === 'Timer')
+          else if (route.name === 'TimerTab')
             iconName = focused ? 'time' : 'time-outline';
-          else if (route.name === 'More')
+          else if (route.name === 'MoreTab')
             iconName = focused ? 'menu' : 'menu-outline';
           return <Icon name={iconName} size={size} color={color} />;
         },
@@ -71,12 +51,124 @@ const AppNavigator = () => {
         tabBarStyle: { backgroundColor: theme.tabBar },
       })}
     >
-      <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Syllabus" component={SyllabusScreen} />
-      <Tab.Screen name="Resources" component={ResourcesScreen} />
-      <Tab.Screen name="Timer" component={TimerScreen} />
-      <Tab.Screen name="More" component={MoreStack} />
+      <Tab.Screen
+        name="HomeTab"
+        component={HomeStackScreen}
+        options={{ tabBarLabel: 'Home' }}
+      />
+      <Tab.Screen
+        name="SyllabusTab"
+        component={SyllabusStackScreen}
+        options={{ tabBarLabel: 'Syllabus' }}
+      />
+      <Tab.Screen
+        name="ResourcesTab"
+        component={ResourcesStackScreen}
+        options={{ tabBarLabel: 'Resources' }}
+      />
+      <Tab.Screen
+        name="TimerTab"
+        component={TimerStackScreen}
+        options={{ tabBarLabel: 'Timer' }}
+      />
+      <Tab.Screen
+        name="MoreTab"
+        component={MoreStackScreen}
+        options={{ tabBarLabel: 'More' }}
+      />
     </Tab.Navigator>
+  );
+};
+
+// Create individual stack navigators for each tab
+const HomeStack = createStackNavigator();
+const HomeStackScreen = () => (
+  <HomeStack.Navigator screenOptions={{ headerShown: false }}>
+    <HomeStack.Screen name="Home" component={HomeScreen} />
+    <HomeStack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
+    <HomeStack.Screen name="Quiz" component={QuizScreen} />
+    <HomeStack.Screen name="QuizResult" component={QuizResultScreen} />
+    <HomeStack.Screen name="Resources" component={ResourcesScreen} />
+    <HomeStack.Screen name="Settings" component={SettingsScreen} />
+    <HomeStack.Screen name="Analytics" component={AnalyticsScreen} />
+    <HomeStack.Screen name="Planner" component={PlannerScreen} />
+    <HomeStack.Screen name="Quotes" component={QuotesScreen} />
+    <HomeStack.Screen name="Tracker" component={TrackerScreen} />
+    <HomeStack.Screen name="Syllabus" component={SyllabusScreen} />
+  </HomeStack.Navigator>
+);
+
+const SyllabusStack = createStackNavigator();
+const SyllabusStackScreen = () => (
+  <SyllabusStack.Navigator screenOptions={{ headerShown: false }}>
+    <SyllabusStack.Screen name="Syllabus" component={SyllabusScreen} />
+    <SyllabusStack.Screen
+      name="SubjectDetail"
+      component={SubjectDetailScreen}
+    />
+    <SyllabusStack.Screen name="Quiz" component={QuizScreen} />
+    <SyllabusStack.Screen name="QuizResult" component={QuizResultScreen} />
+    <SyllabusStack.Screen name="Resources" component={ResourcesScreen} />
+    <SyllabusStack.Screen name="Tracker" component={TrackerScreen} />
+    <SyllabusStack.Screen name="Analytics" component={AnalyticsScreen} />
+  </SyllabusStack.Navigator>
+);
+
+const ResourcesStack = createStackNavigator();
+const ResourcesStackScreen = () => (
+  <ResourcesStack.Navigator screenOptions={{ headerShown: false }}>
+    <ResourcesStack.Screen name="Resources" component={ResourcesScreen} />
+  </ResourcesStack.Navigator>
+);
+
+const TimerStack = createStackNavigator();
+const TimerStackScreen = () => (
+  <TimerStack.Navigator screenOptions={{ headerShown: false }}>
+    <TimerStack.Screen name="Timer" component={TimerScreen} />
+  </TimerStack.Navigator>
+);
+
+const MoreStack = createStackNavigator();
+const MoreStackScreen = () => (
+  <MoreStack.Navigator screenOptions={{ headerShown: false }}>
+    <MoreStack.Screen name="MoreMenu" component={MoreScreen} />
+    <MoreStack.Screen name="Planner" component={PlannerScreen} />
+    <MoreStack.Screen name="Quotes" component={QuotesScreen} />
+    <MoreStack.Screen name="Tracker" component={TrackerScreen} />
+    <MoreStack.Screen name="AiGuide" component={AiGuideScreen} />
+    <MoreStack.Screen name="Syllabus" component={SyllabusScreen} />
+    <MoreStack.Screen name="Timer" component={TimerScreen} />
+    <MoreStack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
+    <MoreStack.Screen name="Quiz" component={QuizScreen} />
+    <MoreStack.Screen name="QuizResult" component={QuizResultScreen} />
+    <MoreStack.Screen name="Settings" component={SettingsScreen} />
+    <MoreStack.Screen name="Analytics" component={AnalyticsScreen} />
+    <MoreStack.Screen name="Resources" component={ResourcesScreen} />
+  </MoreStack.Navigator>
+);
+
+// Authentication navigator
+const AuthStack = createStackNavigator();
+const AuthStackScreen = () => (
+  <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+    <AuthStack.Screen name="Login" component={LoginScreen} />
+    <AuthStack.Screen name="Register" component={RegisterScreen} />
+  </AuthStack.Navigator>
+);
+
+// Root navigator for handling auth flow
+const RootStack = createStackNavigator();
+const AppNavigator = () => {
+  return (
+    <RootStack.Navigator screenOptions={{ headerShown: false }}>
+      {/* For now, just show the main app. Later you can add auth logic:
+      {isSignedIn ? (
+        <RootStack.Screen name="Main" component={MainTabNavigator} />
+      ) : (
+        <RootStack.Screen name="Auth" component={AuthStackScreen} />
+      )} */}
+      <RootStack.Screen name="Main" component={MainTabNavigator} />
+    </RootStack.Navigator>
   );
 };
 

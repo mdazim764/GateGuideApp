@@ -10,16 +10,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeContext } from '../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import CustomHeader from '../components/CustomHeader'; // Adjust the import based on your file structure
 
 const { width } = Dimensions.get('window');
 
-const SubjectDetailScreen = ({ route }) => {
+const SubjectDetailScreen = ({ route, navigation }) => {
+  const { theme } = useContext(ThemeContext);
+  const { subjectId, title } = route.params || {
+    id: 1,
+    title: 'Operating Systems',
+  };
+
   // Eventually you'll get subject from route.params
   const subject = {
     id: 1,
     title: 'Operating Systems',
     progress: 67,
-    description: 'Learn about process management, scheduling algorithms, memory management, and more.',
+    description:
+      'Learn about process management, scheduling algorithms, memory management, and more.',
     topics: [
       { id: 1, title: 'Process Scheduling', progress: 100, completed: true },
       { id: 2, title: 'Memory Management', progress: 75, completed: false },
@@ -31,52 +39,98 @@ const SubjectDetailScreen = ({ route }) => {
       { id: 1, title: 'Process Scheduling Notes', type: 'pdf' },
       { id: 2, title: 'Memory Management Video', type: 'video' },
       { id: 3, title: 'File Systems Practice Questions', type: 'quiz' },
-    ]
+    ],
   };
 
-  const { theme } = useContext(ThemeContext);
-
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]} edges={['top', 'right', 'left']}>
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={styles.container}>
+      <CustomHeader
+        title={title || 'Subject Details'}
+        onBack={() => navigation.goBack()}
+      />
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>{subject.title}</Text>
+          <Text style={[styles.title, { color: theme.text }]}>
+            {subject.title}
+          </Text>
           <View style={styles.progressContainer}>
-            <Text style={[styles.progressText, { color: theme.primary }]}>{subject.progress}% Complete</Text>
-            <View style={[styles.progressBar, { backgroundColor: `${theme.primary}20` }]}>
-              <View 
-                style={[styles.progressFill, { 
-                  backgroundColor: theme.primary,
-                  width: `${subject.progress}%` 
-                }]} 
+            <Text style={[styles.progressText, { color: theme.primary }]}>
+              {subject.progress}% Complete
+            </Text>
+            <View
+              style={[
+                styles.progressBar,
+                { backgroundColor: `${theme.primary}20` },
+              ]}
+            >
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    backgroundColor: theme.primary,
+                    width: `${subject.progress}%`,
+                  },
+                ]}
               />
             </View>
           </View>
-          <Text style={[styles.description, { color: theme.text }]}>{subject.description}</Text>
+          <Text style={[styles.description, { color: theme.text }]}>
+            {subject.description}
+          </Text>
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Topics</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Topics
+          </Text>
           <View style={styles.topicsList}>
             {subject.topics.map(topic => (
-              <TouchableOpacity 
-                key={topic.id} 
+              <TouchableOpacity
+                key={topic.id}
                 style={[styles.topicItem, { backgroundColor: theme.card }]}
+                onPress={() => {
+                  // Navigate to Tracker screen within the MoreTab
+                  navigation.navigate('SyllabusTab', {
+                    screen: 'Tracker',
+                    params: {
+                      initialTab: 'syllabus',
+                      selectedSubjectId: subject.id,
+                      selectedTopicId: topic.id,
+                    },
+                  });
+                }}
               >
                 <View style={styles.topicHeader}>
-                  <Text style={[styles.topicTitle, { color: theme.text }]}>{topic.title}</Text>
+                  <Text style={[styles.topicTitle, { color: theme.text }]}>
+                    {topic.title}
+                  </Text>
                   {topic.completed ? (
                     <Icon name="check-circle" size={24} color={theme.primary} />
                   ) : (
-                    <Text style={[styles.topicProgress, { color: theme.primary }]}>{topic.progress}%</Text>
+                    <Text
+                      style={[styles.topicProgress, { color: theme.primary }]}
+                    >
+                      {topic.progress}%
+                    </Text>
                   )}
                 </View>
-                <View style={[styles.topicProgressBar, { backgroundColor: `${theme.primary}20` }]}>
-                  <View 
-                    style={[styles.topicProgressFill, { 
-                      backgroundColor: theme.primary,
-                      width: `${topic.progress}%` 
-                    }]} 
+                <View
+                  style={[
+                    styles.topicProgressBar,
+                    { backgroundColor: `${theme.primary}20` },
+                  ]}
+                >
+                  <View
+                    style={[
+                      styles.topicProgressFill,
+                      {
+                        backgroundColor: theme.primary,
+                        width: `${topic.progress}%`,
+                      },
+                    ]}
                   />
                 </View>
               </TouchableOpacity>
@@ -85,18 +139,36 @@ const SubjectDetailScreen = ({ route }) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>Study Resources</Text>
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            Study Resources
+          </Text>
           <View style={styles.resourcesList}>
             {subject.resources.map(resource => (
-              <TouchableOpacity 
-                key={resource.id} 
+              <TouchableOpacity
+                key={resource.id}
                 style={[styles.resourceItem, { backgroundColor: theme.card }]}
+                onPress={() => {
+                  // Navigate to Resources screen with filters
+                  navigation.navigate('ResourcesTab', {
+                    screen: 'Resources',
+                    params: {
+                      initialSubject: subject.title,
+                      initialType: resource.type,
+                      searchQuery: resource.title, // Optional: to directly find this resource
+                    },
+                  });
+                }}
               >
-                <Icon 
-                  name={resource.type === 'pdf' ? 'file-pdf-box' : 
-                       resource.type === 'video' ? 'video' : 'help-box'} 
-                  size={24} 
-                  color={theme.primary} 
+                <Icon
+                  name={
+                    resource.type === 'pdf'
+                      ? 'file-pdf-box'
+                      : resource.type === 'video'
+                      ? 'video'
+                      : 'help-box'
+                  }
+                  size={24}
+                  color={theme.primary}
                 />
                 <Text style={[styles.resourceTitle, { color: theme.text }]}>
                   {resource.title}
@@ -108,17 +180,54 @@ const SubjectDetailScreen = ({ route }) => {
         </View>
 
         <View style={styles.actionButtons}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.startButton, { backgroundColor: theme.primary }]}
+            onPress={() => {
+              // Navigate to Resources tab with subject filter
+              navigation.navigate('ResourcesTab', {
+                screen: 'Resources',
+                params: {
+                  initialSubject: subject.title,
+                  initialType: 'All',
+                },
+              });
+            }}
           >
             <Icon name="play" size={20} color="#FFFFFF" />
             <Text style={styles.startButtonText}>Continue Learning</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.quizButton, { backgroundColor: `${theme.primary}20` }]}
+
+          <TouchableOpacity
+            style={[
+              styles.quizButton,
+              { backgroundColor: `${theme.primary}20` },
+            ]}
+            onPress={() => {
+              // This navigates to the Quiz screen in the current stack
+              // If Quiz is in a different stack, use the path below instead
+              navigation.navigate('Quiz', {
+                subjectId: subject.id,
+                title: subject.title,
+              });
+
+              // Alternative for nested navigation:
+              // navigation.navigate('MoreTab', {
+              //   screen: 'Quiz',
+              //   params: {
+              //     subjectId: subject.id,
+              //     title: subject.title
+              //   }
+              // });
+            }}
           >
-            <Icon name="file-document-outline" size={20} color={theme.primary} />
-            <Text style={[styles.quizButtonText, { color: theme.primary }]}>Take Practice Quiz</Text>
+            <Icon
+              name="file-document-outline"
+              size={20}
+              color={theme.primary}
+            />
+            <Text style={[styles.quizButtonText, { color: theme.primary }]}>
+              Take Practice Quiz
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
