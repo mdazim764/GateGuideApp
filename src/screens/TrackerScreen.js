@@ -140,17 +140,17 @@ const TrackerScreen = ({ navigation, route }) => {
           <Text style={[styles.progressText, { color: theme.text }]}>
             {subjectProgress.completed}/{subjectProgress.total} topics completed
           </Text>
-        </View>
-        <View style={styles.progressContainer}>
-          <View
-            style={[
-              styles.progressBar,
-              {
-                width: `${subjectProgress.percentage}%`,
-                backgroundColor: theme.primary,
-              },
-            ]}
-          />
+          <View style={styles.progressContainer}>
+            <View
+              style={[
+                styles.progressBar,
+                {
+                  width: `${subjectProgress.percentage}%`,
+                  backgroundColor: theme.primary,
+                },
+              ]}
+            />
+          </View>
         </View>
         <Icon name="chevron-right" size={24} color={theme.primary} />
       </TouchableOpacity>
@@ -256,6 +256,12 @@ const TrackerScreen = ({ navigation, route }) => {
           total: 20 + Math.floor(Math.random() * 10),
         })),
       },
+      topics: s.topics
+        ? s.topics.map(topic => ({
+            ...topic,
+            correctPercentage: Math.floor(Math.random() * 100),
+          }))
+        : [],
     })),
   };
 
@@ -274,6 +280,7 @@ const TrackerScreen = ({ navigation, route }) => {
         'Memory Management',
         'File Systems',
       ],
+      trend: 'up',
     },
     {
       id: '2',
@@ -284,6 +291,7 @@ const TrackerScreen = ({ navigation, route }) => {
       questionCount: 20,
       correctCount: 16,
       topicsCovered: ['Arrays', 'Linked Lists', 'Trees', 'Graphs'],
+      trend: 'down',
     },
     {
       id: '3',
@@ -294,6 +302,7 @@ const TrackerScreen = ({ navigation, route }) => {
       questionCount: 12,
       correctCount: 11,
       topicsCovered: ['OSI Model', 'TCP/IP', 'Routing'],
+      trend: 'up',
     },
   ];
 
@@ -392,7 +401,20 @@ const TrackerScreen = ({ navigation, route }) => {
             onBack={() => setSelectedYear(null)}
           />
 
-          <View style={[styles.statsRow, { backgroundColor: theme.card }]}>
+          {/* Enhanced Stats Card */}
+          <View
+            style={[
+              styles.statsCard,
+              {
+                backgroundColor: theme.card,
+                marginHorizontal: 16,
+                marginBottom: 16,
+                borderRadius: 12,
+                padding: 16,
+                elevation: 3,
+              },
+            ]}
+          >
             <StatBox
               icon="file-document"
               label="Total"
@@ -400,7 +422,7 @@ const TrackerScreen = ({ navigation, route }) => {
               theme={theme}
             />
             <StatBox
-              icon="check-circle"
+              icon="check"
               label="Attempted"
               value={yearData.attempted}
               theme={theme}
@@ -413,68 +435,80 @@ const TrackerScreen = ({ navigation, route }) => {
             />
           </View>
 
+          {/* Enhanced Question Cards */}
           <FlatList
             data={yearQuestions}
             keyExtractor={item => item.id}
             renderItem={({ item }) => (
-              <TouchableOpacity
-                style={[styles.questionCard, { backgroundColor: theme.card }]}
-                onPress={() => {
-                  // Navigate to PYQ detail/practice
-                  navigation.navigate('Quiz', {
-                    mode: 'pyq',
-                    subjectId: subject.id,
-                    subjectName: subject.name,
-                    year: selectedYear,
-                    questionId: item.id,
-                  });
-                }}
+              <View
+                style={[
+                  styles.questionCard,
+                  {
+                    backgroundColor: theme.card,
+                    marginHorizontal: 16,
+                    marginBottom: 16,
+                    padding: 16,
+                    borderRadius: 12,
+                    elevation: 2,
+                  },
+                ]}
               >
+                {/* Difficulty Tag + Correct/Incorrect Status */}
                 <View style={styles.questionHeader}>
-                  <View style={styles.questionDifficulty}>
+                  {/* Difficulty Badge */}
+                  <View
+                    style={[
+                      styles.difficultyBadge,
+                      {
+                        backgroundColor:
+                          item.difficulty === 'Hard'
+                            ? 'rgba(229, 57, 53, 0.1)'
+                            : item.difficulty === 'Medium'
+                            ? 'rgba(251, 140, 0, 0.1)'
+                            : 'rgba(67, 160, 71, 0.1)',
+                      },
+                    ]}
+                  >
                     <Text
-                      style={[
-                        styles.difficultyText,
-                        {
-                          color:
-                            item.difficulty === 'Hard'
-                              ? '#E53935'
-                              : item.difficulty === 'Medium'
-                              ? '#FB8C00'
-                              : '#43A047',
-                        },
-                      ]}
+                      style={{
+                        color:
+                          item.difficulty === 'Hard'
+                            ? '#E53935'
+                            : item.difficulty === 'Medium'
+                            ? '#FB8C00'
+                            : '#43A047',
+                        fontWeight: '600',
+                        fontSize: 12,
+                      }}
                     >
                       {item.difficulty}
                     </Text>
                   </View>
 
+                  {/* Status Badge */}
                   {item.attempted && (
                     <View
                       style={[
-                        styles.attemptedTag,
+                        styles.statusBadge,
                         {
                           backgroundColor: item.isCorrect
-                            ? `${theme.success}20`
-                            : `${theme.error}20`,
-                          borderColor: item.isCorrect
-                            ? theme.success
-                            : theme.error,
+                            ? 'rgba(67, 160, 71, 0.1)'
+                            : 'rgba(229, 57, 53, 0.1)',
                         },
                       ]}
                     >
                       <Icon
                         name={item.isCorrect ? 'check' : 'close'}
                         size={14}
-                        color={item.isCorrect ? theme.success : theme.error}
+                        color={item.isCorrect ? '#43A047' : '#E53935'}
                       />
                       <Text
-                        style={[
-                          styles.attemptedText,
-                          {
-                            color: item.isCorrect ? theme.success : theme.error,
-                          },
-                        ]}
+                        style={{
+                          color: item.isCorrect ? '#43A047' : '#E53935',
+                          fontWeight: '500',
+                          fontSize: 12,
+                          marginLeft: 4,
+                        }}
                       >
                         {item.isCorrect ? 'Correct' : 'Incorrect'}
                       </Text>
@@ -482,38 +516,54 @@ const TrackerScreen = ({ navigation, route }) => {
                   )}
                 </View>
 
+                {/* Question Text */}
                 <Text
-                  style={[styles.questionText, { color: theme.text }]}
+                  style={[
+                    styles.questionText,
+                    {
+                      color: theme.text,
+                      fontSize: 15,
+                      marginVertical: 12,
+                      lineHeight: 22,
+                    },
+                  ]}
                   numberOfLines={3}
                 >
                   {item.question}
                 </Text>
 
-                <View style={styles.questionFooter}>
-                  <TouchableOpacity
-                    style={[
-                      styles.solveButton,
-                      { backgroundColor: theme.primary },
-                    ]}
-                    onPress={() => {
-                      // Navigate to solve this specific PYQ
-                      navigation.navigate('Quiz', {
+                {/* Review Button */}
+                <TouchableOpacity
+                  style={[
+                    styles.reviewButton,
+                    { backgroundColor: theme.primary },
+                  ]}
+                  onPress={() => {
+                    navigation.navigate('MoreTab', {
+                      screen: 'Quiz',
+                      params: {
                         mode: 'pyq',
                         subjectId: subject.id,
                         subjectName: subject.name,
                         year: selectedYear,
                         questionId: item.id,
-                      });
+                      },
+                    });
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: '#FFFFFF',
+                      fontWeight: '600',
+                      fontSize: 14,
                     }}
                   >
-                    <Text style={styles.solveButtonText}>
-                      {item.attempted ? 'Review' : 'Solve'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
+                    Review
+                  </Text>
+                </TouchableOpacity>
+              </View>
             )}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[styles.list, { paddingBottom: 24 }]}
           />
         </SafeAreaView>
       );
@@ -529,7 +579,20 @@ const TrackerScreen = ({ navigation, route }) => {
           onBack={() => setSelectedPyqSubject(null)}
         />
 
-        <View style={[styles.statsRow, { backgroundColor: theme.card }]}>
+        {/* Enhanced Stats Card */}
+        <View
+          style={[
+            styles.statsCard,
+            {
+              backgroundColor: theme.card,
+              margin: 16,
+              marginBottom: 16,
+              borderRadius: 12,
+              padding: 16,
+              elevation: 3,
+            },
+          ]}
+        >
           <StatBox
             icon="check"
             label="Attempted"
@@ -550,64 +613,107 @@ const TrackerScreen = ({ navigation, route }) => {
           />
         </View>
 
-        <Text style={[styles.sectionTitle, { color: theme.text }]}>
+        <Text
+          style={[
+            styles.sectionTitle,
+            { color: theme.text, marginLeft: 16, marginBottom: 8 },
+          ]}
+        >
           Year-wise PYQs
         </Text>
 
+        {/* Enhanced Year Cards */}
         <FlatList
           data={subject.pyq.yearWiseAttempts}
           keyExtractor={item => item.year}
           renderItem={({ item }) => (
             <TouchableOpacity
-              style={[styles.yearCard, { backgroundColor: theme.card }]}
+              style={[
+                styles.yearCard,
+                {
+                  backgroundColor: theme.card,
+                  marginHorizontal: 16,
+                  marginBottom: 12,
+                  padding: 16,
+                  borderRadius: 12,
+                  elevation: 2,
+                  borderLeftWidth: 4,
+                  borderLeftColor: theme.primary,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                },
+              ]}
               onPress={() => setSelectedYear(item.year)}
             >
-              <View style={styles.yearInfo}>
-                <Text style={[styles.yearTitle, { color: theme.text }]}>
+              <View>
+                <Text
+                  style={[
+                    styles.yearTitle,
+                    { color: theme.text, fontWeight: 'bold', fontSize: 16 },
+                  ]}
+                >
                   GATE {item.year}
                 </Text>
-                <Text style={[styles.yearProgress, { color: theme.text }]}>
+                <Text
+                  style={[
+                    styles.yearStats,
+                    { color: theme.textSecondary, marginTop: 4 },
+                  ]}
+                >
                   {item.attempted}/{item.total} attempted
                 </Text>
-              </View>
-
-              <View
-                style={[
-                  styles.yearProgressBar,
-                  { backgroundColor: `${theme.primary}20` },
-                ]}
-              >
-                <View
-                  style={[
-                    styles.yearProgressFill,
-                    {
-                      width: `${(item.attempted / item.total) * 100}%`,
-                      backgroundColor: theme.primary,
-                    },
-                  ]}
-                />
               </View>
 
               <Icon name="chevron-right" size={24} color={theme.primary} />
             </TouchableOpacity>
           )}
+          scrollEnabled={false}
           contentContainerStyle={styles.list}
         />
 
-        <View style={styles.actionButtonContainer}>
+        {/* Practice All Button */}
+        <View style={{ padding: 16, paddingTop: 8 }}>
           <TouchableOpacity
-            style={[styles.actionButton, { backgroundColor: theme.primary }]}
+            style={[
+              styles.practiceAllButton,
+              {
+                backgroundColor: theme.primary,
+                paddingVertical: 16,
+                borderRadius: 12,
+                flexDirection: 'row',
+                justifyContent: 'center',
+                alignItems: 'center',
+                elevation: 3,
+              },
+            ]}
             onPress={() => {
               // Navigate to a practice mode that combines questions from all years
-              navigation.navigate('Quiz', {
-                mode: 'pyq',
-                subjectId: subject.id,
-                subjectName: subject.name,
+              navigation.navigate('MoreTab', {
+                screen: 'Quiz',
+                params: {
+                  mode: 'pyq',
+                  subjectId: subject.id,
+                  subjectName: subject.name,
+                },
               });
             }}
           >
-            <Icon name="play" size={20} color="#FFFFFF" />
-            <Text style={styles.actionButtonText}>Practice All PYQs</Text>
+            <Icon
+              name="play"
+              size={20}
+              color="#FFFFFF"
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              style={{
+                color: '#FFFFFF',
+                fontSize: 16,
+                fontWeight: '600',
+              }}
+            >
+              Practice All PYQs
+            </Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -631,7 +737,18 @@ const TrackerScreen = ({ navigation, route }) => {
             <Text style={[styles.title, { color: theme.text }]}>
               Syllabus Tracker
             </Text>
-            <View style={[styles.overallCard, { backgroundColor: theme.card }]}>
+            <View
+              style={[
+                styles.overallCard,
+                {
+                  backgroundColor: theme.card,
+                  marginHorizontal: 16,
+                  borderRadius: 12,
+                  padding: 16,
+                  elevation: 3,
+                },
+              ]}
+            >
               <Text style={[styles.overallTitle, { color: theme.text }]}>
                 Overall Progress
               </Text>
@@ -671,9 +788,21 @@ const TrackerScreen = ({ navigation, route }) => {
             <Text style={[styles.title, { color: theme.text }]}>
               PYQ Tracker
             </Text>
-            
-            {/* Enhanced Stats Row */}
-            <View style={[styles.statsRow, { backgroundColor: theme.card }]}>
+
+            {/* Enhanced Stats Card */}
+            <View
+              style={[
+                styles.statsCard,
+                {
+                  backgroundColor: theme.card,
+                  marginHorizontal: 16,
+                  marginBottom: 16,
+                  borderRadius: 12,
+                  padding: 16,
+                  elevation: 3,
+                },
+              ]}
+            >
               <StatBox
                 icon="check"
                 label="Attempted"
@@ -694,94 +823,161 @@ const TrackerScreen = ({ navigation, route }) => {
               />
             </View>
 
-            {/* Action Button with Fixed Styling */}
-            <View style={styles.actionButtonContainer}>
-              <TouchableOpacity
-                style={[styles.actionButton, { 
-                  backgroundColor: theme.primary,
-                  marginHorizontal: 16,
-                  marginVertical: 8,
-                  paddingVertical: 12
-                }]}
-                onPress={() => navigation.navigate('Quiz', {
-                  quizType: 'pyq',
-                  questionCount: 10,
-                  difficulty: 'medium'
-                })}
-              >
-                <Icon name="shuffle-variant" size={20} color="#FFFFFF" style={{marginRight: 8}} />
-                <Text style={[styles.actionButtonText, {fontSize: 16, fontWeight: '500'}]}>
-                  Random PYQ Practice
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 16 }]}>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.text, marginTop: 16, marginLeft: 16 },
+              ]}
+            >
               Subject-wise PYQs
             </Text>
-            
+
             {/* Fixed Card Layout */}
             <FlatList
               data={pyqStats.subjects}
               keyExtractor={item => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[styles.subjectCard, { 
-                    backgroundColor: theme.card,
-                    marginBottom: 12,
-                    padding: 16,
-                    borderRadius: 12
-                  }]}
+                  style={[
+                    styles.subjectCard,
+                    {
+                      backgroundColor: theme.card,
+                      marginHorizontal: 16,
+                      marginBottom: 12,
+                      padding: 16,
+                      borderRadius: 12,
+                      elevation: 2,
+                      borderLeftWidth: 4,
+                      borderLeftColor: theme.primary,
+                    },
+                  ]}
                   onPress={() => setSelectedPyqSubject(item)}
                 >
                   <View style={styles.subjectInfo}>
-                    <Text style={[styles.subjectTitle, { 
-                      color: theme.text, 
-                      fontSize: 16,
-                      fontWeight: 'bold',
-                      marginBottom: 8 
-                    }]}>
+                    <Text
+                      style={[
+                        styles.subjectTitle,
+                        {
+                          color: theme.text,
+                          fontSize: 16,
+                          fontWeight: 'bold',
+                          marginBottom: 8,
+                        },
+                      ]}
+                    >
                       {item.name}
                     </Text>
                     <Text style={[styles.progressText, { color: theme.text }]}>
-                      {item.pyq.attempted} attempted, {item.pyq.correct} correct, {item.pyq.incorrect} incorrect
+                      {item.pyq.attempted} attempted, {item.pyq.correct}{' '}
+                      correct, {item.pyq.incorrect} incorrect
                     </Text>
-                    
+
                     {/* Topic Progress Section with Fixed Styling */}
-                    <View style={[styles.topicProgressContainer, {marginTop: 12}]}>
-                      {item.topics && item.topics.slice(0, 3).map(topic => (
-                        <View key={topic.id} style={[styles.topicProgressItem, {marginBottom: 10}]}>
-                          <View style={styles.topicProgressHeader}>
-                            <Text style={[styles.topicProgressLabel, { color: theme.text }]}>
-                              {topic.name}
-                            </Text>
-                            <Text style={[styles.topicProgressValue, { color: theme.primary }]}>
-                              {topic.correctPercentage}%
-                            </Text>
+                    <View
+                      style={[styles.topicProgressContainer, { marginTop: 12 }]}
+                    >
+                      {item.topics &&
+                        item.topics.slice(0, 3).map(topic => (
+                          <View
+                            key={topic.id}
+                            style={[
+                              styles.topicProgressItem,
+                              { marginBottom: 10 },
+                            ]}
+                          >
+                            <View style={styles.topicProgressHeader}>
+                              <Text
+                                style={[
+                                  styles.topicProgressLabel,
+                                  { color: theme.text },
+                                ]}
+                              >
+                                {topic.name}
+                              </Text>
+                              <Text
+                                style={[
+                                  styles.topicProgressValue,
+                                  { color: theme.primary },
+                                ]}
+                              >
+                                {topic.correctPercentage || 0}%
+                              </Text>
+                            </View>
+                            <View
+                              style={[
+                                styles.topicProgressBar,
+                                {
+                                  backgroundColor: `${theme.primary}20`,
+                                  height: 6,
+                                  marginTop: 4,
+                                },
+                              ]}
+                            >
+                              <View
+                                style={[
+                                  styles.topicProgressFill,
+                                  {
+                                    backgroundColor: theme.primary,
+                                    width: `${topic.correctPercentage || 0}%`,
+                                    height: '100%',
+                                  },
+                                ]}
+                              />
+                            </View>
                           </View>
-                          <View style={[styles.topicProgressBar, { 
-                            backgroundColor: `${theme.primary}20`,
-                            height: 6,
-                            marginTop: 4 
-                          }]}>
-                            <View 
-                              style={[styles.topicProgressFill, { 
-                                backgroundColor: theme.primary,
-                                width: `${topic.correctPercentage}%`,
-                                height: '100%' 
-                              }]} 
-                            />
-                          </View>
-                        </View>
-                      ))}
+                        ))}
                     </View>
                   </View>
                   <Icon name="chevron-right" size={24} color={theme.primary} />
                 </TouchableOpacity>
               )}
-              scrollEnabled={true}
+              scrollEnabled={false}
               contentContainerStyle={styles.list}
             />
+
+            {/* PYQ Practice Button */}
+            <View style={{ padding: 16, paddingTop: 0 }}>
+              <TouchableOpacity
+                style={[
+                  styles.practiceAllButton,
+                  {
+                    backgroundColor: theme.primary,
+                    paddingVertical: 16,
+                    borderRadius: 12,
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    elevation: 3,
+                  },
+                ]}
+                onPress={() => {
+                  navigation.navigate('MoreTab', {
+                    screen: 'Quiz',
+                    params: {
+                      quizType: 'pyq',
+                      questionCount: 10,
+                      difficulty: 'medium',
+                    },
+                  });
+                }}
+              >
+                <Icon
+                  name="shuffle-variant"
+                  size={20}
+                  color="#FFFFFF"
+                  style={{ marginRight: 8 }}
+                />
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 16,
+                    fontWeight: '600',
+                  }}
+                >
+                  Random PYQ Practice
+                </Text>
+              </TouchableOpacity>
+            </View>
           </>
         )}
 
@@ -792,31 +988,56 @@ const TrackerScreen = ({ navigation, route }) => {
               Quizzes Tracker
             </Text>
 
-            {/* Enhanced Action Button */}
-            <View style={[styles.actionButtonContainer, {marginHorizontal: 16, marginBottom: 16}]}>
+            {/* Enhanced Take New Quiz Button */}
+            <View style={{ padding: 16 }}>
               <TouchableOpacity
                 style={[
-                  styles.actionButton,
-                  { 
+                  styles.newQuizButton,
+                  {
                     backgroundColor: theme.primary,
-                    paddingVertical: 14,
-                    borderRadius: 10
+                    paddingVertical: 16,
+                    borderRadius: 12,
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    elevation: 3,
                   },
                 ]}
-                onPress={() => navigation.navigate('Quiz', {
-                  quizType: 'ai',
-                  questionCount: 10,
-                  difficulty: 'medium'
-                })}
+                onPress={() => {
+                  navigation.navigate('MoreTab', {
+                    screen: 'Quiz',
+                    params: {
+                      quizType: 'ai',
+                      questionCount: 10,
+                      difficulty: 'medium',
+                    },
+                  });
+                }}
               >
-                <Icon name="plus" size={20} color="#FFFFFF" style={{marginRight: 8}} />
-                <Text style={[styles.actionButtonText, {fontSize: 16, fontWeight: '500'}]}>
+                <Icon
+                  name="plus"
+                  size={20}
+                  color="#FFFFFF"
+                  style={{ marginRight: 8 }}
+                />
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 16,
+                    fontWeight: '600',
+                  }}
+                >
                   Take New Quiz
                 </Text>
               </TouchableOpacity>
             </View>
 
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            <Text
+              style={[
+                styles.sectionTitle,
+                { color: theme.text, marginLeft: 16 },
+              ]}
+            >
               Recent Quiz Results
             </Text>
 
@@ -826,86 +1047,168 @@ const TrackerScreen = ({ navigation, route }) => {
               keyExtractor={item => item.id}
               renderItem={({ item }) => (
                 <TouchableOpacity
-                  style={[styles.quizCard, { 
-                    backgroundColor: theme.card,
-                    marginHorizontal: 16,
-                    marginBottom: 12,
-                    padding: 16,
-                    borderRadius: 12,
-                    elevation: 3
-                  }]}
-                  onPress={() => navigation.navigate('QuizResult', {
-                    result: {
-                      quizId: item.id,
-                      subject: item.subject,
-                      score: item.score,
-                      correctAnswers: item.correctCount,
-                      totalQuestions: item.questionCount,
-                      timeTaken: item.time,
-                      date: item.date,
-                      feedback: {
-                        mentorAnalysis: item.mentorFeedback || "Good attempt on this quiz!",
-                        questionByQuestionReview: item.questions || []
-                      }
-                    }
-                  })}
+                  style={[
+                    styles.quizCard,
+                    {
+                      backgroundColor: theme.card,
+                      marginHorizontal: 16,
+                      marginBottom: 16,
+                      borderRadius: 12,
+                      overflow: 'hidden',
+                      elevation: 3,
+                    },
+                  ]}
+                  onPress={() =>
+                    navigation.navigate('QuizResult', {
+                      result: {
+                        quizId: item.id,
+                        subject: item.subject,
+                        score: item.score,
+                        correctAnswers: item.correctCount,
+                        totalQuestions: item.questionCount,
+                        timeTaken: item.time,
+                        date: item.date,
+                        feedback: {
+                          mentorAnalysis:
+                            item.mentorFeedback || 'Good attempt on this quiz!',
+                          questionByQuestionReview: item.questions || [],
+                        },
+                      },
+                    })
+                  }
                 >
-                  <View style={styles.quizInfo}>
-                    <Text style={[styles.quizSubject, { 
-                      color: theme.primary, 
-                      fontSize: 16,
-                      fontWeight: 'bold',
-                      marginBottom: 6
-                    }]}>
-                      {item.subject}
-                    </Text>
-                    <Text style={[styles.quizScore, { 
-                      color: theme.text,
-                      fontSize: 15,
-                      marginBottom: 6
-                    }]}>
-                      Score: {item.score}% ({item.correctCount}/{item.questionCount})
-                    </Text>
-                    <Text style={[styles.quizTopics, { color: theme.textSecondary }]}>
-                      {item.topicsCovered.join(', ')}
-                    </Text>
-                    
-                    {item.trend && (
-                      <View style={[styles.trendContainer, {marginTop: 8}]}>
-                        <Icon 
-                          name={item.trend === 'up' ? 'trending-up' : item.trend === 'down' ? 'trending-down' : 'trending-neutral'} 
-                          size={18} 
-                          color={item.trend === 'up' ? '#4CAF50' : item.trend === 'down' ? '#F44336' : theme.textSecondary} 
-                        />
-                        <Text style={[
-                          styles.trendText, 
-                          { 
-                            color: item.trend === 'up' ? '#4CAF50' : item.trend === 'down' ? '#F44336' : theme.textSecondary,
-                            marginLeft: 6
-                          }
-                        ]}>
-                          {item.trend === 'up' ? 'Improved' : item.trend === 'down' ? 'Declined' : 'Stable'}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <View style={styles.quizMeta}>
-                    <Text style={[styles.quizDate, { color: theme.textSecondary }]}>
-                      {item.date}
-                    </Text>
-                    <Text style={[styles.quizTime, { color: theme.textSecondary, marginVertical: 4 }]}>
-                      {item.time}
-                    </Text>
-                    <Icon
-                      name="chevron-right"
-                      size={20}
-                      color={theme.primary}
+                  <View style={{ flexDirection: 'row' }}>
+                    {/* Left color accent */}
+                    <View
+                      style={{
+                        width: 6,
+                        backgroundColor: theme.primary,
+                      }}
                     />
+
+                    {/* Content */}
+                    <View style={{ flex: 1, padding: 16 }}>
+                      <View
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        {/* Left side: Subject & score */}
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={{
+                              color: theme.primary,
+                              fontSize: 16,
+                              fontWeight: 'bold',
+                            }}
+                          >
+                            {item.subject}
+                          </Text>
+                          <Text
+                            style={{
+                              color: theme.text,
+                              fontSize: 14,
+                              marginTop: 6,
+                              marginBottom: 4,
+                            }}
+                          >
+                            Score: {item.score}% ({item.correctCount}/
+                            {item.questionCount})
+                          </Text>
+                          <Text
+                            style={{
+                              color: theme.textSecondary,
+                              fontSize: 13,
+                            }}
+                            numberOfLines={1}
+                            ellipsizeMode="tail"
+                          >
+                            {item.topicsCovered.join(', ')}
+                          </Text>
+
+                          {/* Trend indicator */}
+                          {item.trend && (
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                marginTop: 8,
+                              }}
+                            >
+                              <Icon
+                                name={
+                                  item.trend === 'up'
+                                    ? 'trending-up'
+                                    : item.trend === 'down'
+                                    ? 'trending-down'
+                                    : 'trending-neutral'
+                                }
+                                size={16}
+                                color={
+                                  item.trend === 'up'
+                                    ? '#4CAF50'
+                                    : item.trend === 'down'
+                                    ? '#F44336'
+                                    : theme.textSecondary
+                                }
+                              />
+                              <Text
+                                style={{
+                                  marginLeft: 4,
+                                  color:
+                                    item.trend === 'up'
+                                      ? '#4CAF50'
+                                      : item.trend === 'down'
+                                      ? '#F44336'
+                                      : theme.textSecondary,
+                                  fontSize: 12,
+                                  fontWeight: '500',
+                                }}
+                              >
+                                {item.trend === 'up'
+                                  ? 'Improved'
+                                  : item.trend === 'down'
+                                  ? 'Declined'
+                                  : 'Stable'}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+
+                        {/* Right side: Date, time & icon */}
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text
+                            style={{
+                              color: theme.textSecondary,
+                              fontSize: 13,
+                            }}
+                          >
+                            {item.date}
+                          </Text>
+                          <Text
+                            style={{
+                              color: theme.textSecondary,
+                              fontSize: 13,
+                              marginVertical: 4,
+                            }}
+                          >
+                            {item.time}
+                          </Text>
+                          <Icon
+                            name="chevron-right"
+                            size={20}
+                            color={theme.primary}
+                            style={{ marginTop: 4 }}
+                          />
+                        </View>
+                      </View>
+                    </View>
                   </View>
                 </TouchableOpacity>
               )}
-              scrollEnabled={true}
-              contentContainerStyle={[styles.list, {paddingBottom: 20}]}
+              scrollEnabled={false}
+              contentContainerStyle={[styles.list, { paddingBottom: 20 }]}
             />
           </>
         )}
@@ -917,7 +1220,17 @@ const TrackerScreen = ({ navigation, route }) => {
               Progress Analytics
             </Text>
 
-            <View style={styles.analyticsGrid}>
+            {/* Analytics Grid */}
+            <View
+              style={[
+                styles.analyticsGrid,
+                {
+                  marginHorizontal: 16,
+                  marginTop: 8,
+                  marginBottom: 16,
+                },
+              ]}
+            >
               <AnalyticsBox
                 label="Daily"
                 data={analytics.daily}
@@ -940,28 +1253,27 @@ const TrackerScreen = ({ navigation, route }) => {
               />
             </View>
 
+            {/* Study Insights Card */}
             <View
               style={[
-                styles.insightsContainer,
+                styles.insightsCard,
                 {
                   backgroundColor: theme.card,
                   marginHorizontal: 16,
-                  borderRadius: 8,
+                  borderRadius: 12,
                   padding: 16,
                   marginBottom: 16,
+                  elevation: 3,
                 },
               ]}
             >
               <Text
-                style={[
-                  styles.insightsTitle,
-                  {
-                    color: theme.text,
-                    fontSize: 16,
-                    fontWeight: 'bold',
-                    marginBottom: 12,
-                  },
-                ]}
+                style={{
+                  color: theme.text,
+                  fontSize: 16,
+                  fontWeight: 'bold',
+                  marginBottom: 12,
+                }}
               >
                 Study Insights
               </Text>
@@ -991,18 +1303,36 @@ const TrackerScreen = ({ navigation, route }) => {
               />
             </View>
 
-            <TouchableOpacity
-              style={[
-                styles.viewDetailButton,
-                { backgroundColor: theme.primary },
-              ]}
-              onPress={() => navigation.navigate('Analytics')}
-            >
-              <Text style={styles.viewDetailButtonText}>
-                View Detailed Analytics
-              </Text>
-              <Icon name="arrow-right" size={20} color="#FFFFFF" />
-            </TouchableOpacity>
+            {/* View Detailed Analytics Button */}
+            <View style={{ padding: 16, paddingTop: 0 }}>
+              <TouchableOpacity
+                style={[
+                  styles.detailedAnalyticsButton,
+                  {
+                    backgroundColor: theme.primary,
+                    paddingVertical: 16,
+                    borderRadius: 12,
+                    flexDirection: 'row',
+                    justifyContent: 'center',
+                    alignItems: 'center',
+                    elevation: 3,
+                  },
+                ]}
+                onPress={() => navigation.navigate('Analytics')}
+              >
+                <Text
+                  style={{
+                    color: '#FFFFFF',
+                    fontSize: 16,
+                    fontWeight: '600',
+                    marginRight: 8,
+                  }}
+                >
+                  View Detailed Analytics
+                </Text>
+                <Icon name="arrow-right" size={20} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
           </>
         )}
       </ScrollView>
@@ -1093,10 +1423,10 @@ const styles = StyleSheet.create({
   },
   overallCard: {
     marginHorizontal: 16,
-    marginBottom: 8,
+    marginBottom: 16,
     padding: 16,
-    borderRadius: 8,
-    elevation: 2,
+    borderRadius: 12,
+    elevation: 3,
   },
   overallTitle: {
     fontSize: 16,
@@ -1148,19 +1478,6 @@ const styles = StyleSheet.create({
   progressText: {
     fontSize: 13,
   },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    marginRight: 16,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
   topicItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1180,97 +1497,33 @@ const styles = StyleSheet.create({
   weightageText: {
     fontSize: 13,
   },
-  statsRow: {
+  // Stats card and boxes
+  statsCard: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 8,
-    padding: 12,
-    elevation: 2,
+    // marginHorizontal: 16,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    borderRadius: 12,
+    elevation: 3,
   },
   statBox: {
     flex: 1,
     alignItems: 'center',
-    padding: 8,
+    padding: 4,
   },
   statLabel: {
     fontSize: 13,
-    marginTop: 4,
+    marginTop: 6,
     marginBottom: 2,
   },
   statValue: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: 'bold',
     marginTop: 2,
   },
-  quizCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    elevation: 2,
-  },
-  quizInfo: {
-    flex: 1,
-  },
-  quizSubject: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  quizScore: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  quizTopics: {
-    fontSize: 12,
-    opacity: 0.7,
-  },
-  quizMeta: {
-    alignItems: 'flex-end',
-  },
-  quizDate: {
-    fontSize: 13,
-    marginBottom: 2,
-  },
-  quizTime: {
-    fontSize: 13,
-  },
-  analyticsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginHorizontal: 16,
-    marginTop: 8,
-  },
-  analyticsBox: {
-    width: (width - 48) / 2,
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 16,
-    elevation: 2,
-  },
-  analyticsLabel: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  analyticsText: {
-    fontSize: 14,
-  },
-  screenHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 18,
-    paddingBottom: 8,
-  },
-  screenHeaderText: {
-    fontSize: 26,
-    fontWeight: 'bold',
-  },
-  // New styles for PYQ section
+  // Topic progress
   topicProgressContainer: {
     marginTop: 10,
   },
@@ -1299,33 +1552,119 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 3,
   },
-  
-  // New styles for Quiz section
-  trendContainer: {
+  // Year cards
+  yearCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    justifyContent: 'space-between',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 12,
+    elevation: 2,
   },
-  trendText: {
-    fontSize: 12,
-    marginLeft: 4,
-    fontWeight: '500',
-  },
-  actionButtonContainer: {
-    marginVertical: 12,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-  },
-  actionButtonText: {
-    color: '#FFFFFF',
+  yearTitle: {
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  yearStats: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  // Question cards
+  questionCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+  },
+  questionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  difficultyBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+  },
+  questionText: {
+    fontSize: 15,
+    marginVertical: 12,
+    lineHeight: 22,
+  },
+  reviewButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    alignSelf: 'flex-end',
+    marginTop: 8,
+  },
+  // Quiz cards
+  quizCard: {
+    overflow: 'hidden',
+    borderRadius: 12,
+    marginBottom: 16,
+    elevation: 3,
+  },
+  // Analytics
+  analyticsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  analyticsBox: {
+    width: (width - 48) / 2,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+    elevation: 3,
+  },
+  analyticsLabel: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  analyticsText: {
+    fontSize: 14,
+    marginBottom: 4,
+  },
+  insightsCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 3,
+  },
+  // Buttons
+  practiceAllButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    elevation: 3,
+  },
+  newQuizButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    elevation: 3,
+  },
+  detailedAnalyticsButton: {
+    borderRadius: 12,
+    paddingVertical: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    elevation: 3,
   },
 });
 
