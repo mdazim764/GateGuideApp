@@ -76,7 +76,10 @@ const QuizScreen = ({ navigation, route }) => {
   const [topicOpen, setTopicOpen] = useState(false);
   const [subjectItems, setSubjectItems] = useState([
     { label: 'All Subjects', value: 'all' },
-    ...subjects.map(subject => ({ label: subject.name, value: subject.id })),
+    ...(subjects || []).map(subject => ({
+      label: subject.name,
+      value: subject.id,
+    })),
   ]);
   const [topicItems, setTopicItems] = useState([
     { label: 'All Topics', value: 'all' },
@@ -638,10 +641,12 @@ const QuizScreen = ({ navigation, route }) => {
   };
 
   const renderQuizContent = () => {
-    if (!quiz) return null;
+    if (!quiz || !quiz.questions || !quiz.questions.length) return null;
 
     const currentQuestion = quiz.questions[currentQuestionIndex];
     const isAnswered = selectedAnswers[currentQuestion.id] !== undefined;
+
+    if (!currentQuestion) return null;
 
     return (
       <View style={styles.quizContainer}>
@@ -722,7 +727,7 @@ const QuizScreen = ({ navigation, route }) => {
             </Text>
 
             <View style={styles.optionsContainer}>
-              {currentQuestion.options.map((option, index) => (
+              {(currentQuestion.options || []).map((option, index) => (
                 <TouchableOpacity
                   key={index}
                   style={[
@@ -858,7 +863,14 @@ const QuizScreen = ({ navigation, route }) => {
   const getTopicsForSubject = subjectId => {
     const selectedSubjectData = subjects.find(s => s.id === subjectId);
     // Return empty array if no topics found
-    return selectedSubjectData?.topics || topics[subjectId] || [];
+    if (!subjectId) return [];
+
+    return (
+      selectedSubjectData?.topics ||
+      (topics && topics[subjectId]) ||
+      topics[subjectId] ||
+      []
+    );
   };
 
   // Add these helper functions before the return statement
