@@ -3,7 +3,14 @@ import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { ThemeContext } from '../theme/ThemeContext';
 
-const CustomHeader = ({ title, onBack, rightIcon, onRightPress, navigation, route }) => {
+const CustomHeader = ({
+  title,
+  onBack,
+  rightIcon,
+  onRightPress,
+  navigation,
+  route,
+}) => {
   const { theme } = useContext(ThemeContext);
 
   // Add defensive programming to prevent errors

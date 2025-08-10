@@ -337,24 +337,24 @@ const ResourcesScreen = ({ navigation, route }) => {
       style={[styles.container, { backgroundColor: theme.background }]}
     >
       <CustomHeader title="Resources" />
-      
+
       {/* Add a section for YouTube content */}
       <View style={styles.section}>
-        <Text style={[styles.sectionTitle, {color: theme.text}]}>
+        <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Video Tutorials
         </Text>
-        <TouchableOpacity 
-          style={[styles.resourceCard, {backgroundColor: theme.card}]}
+        <TouchableOpacity
+          style={[styles.resourceCard, { backgroundColor: theme.card }]}
           onPress={() => navigation.navigate('YouTubePlaylist')}
         >
           <Icon name="youtube" size={24} color="red" />
-          <Text style={[styles.resourceText, {color: theme.text}]}>
+          <Text style={[styles.resourceText, { color: theme.text }]}>
             Educational Playlists
           </Text>
           <Icon name="chevron-right" size={20} color={theme.text} />
         </TouchableOpacity>
       </View>
-      
+
       <View
         style={[styles.searchContainer, { backgroundColor: `${theme.text}10` }]}
       >
