@@ -169,347 +169,370 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
 
   const playerDimensions = getPlayerDimensions();
 
-  return isFullscreen ? (
-    // Fullscreen mode - completely detached from navigation
-    <View style={styles.fullscreenWrapper}>
-      <StatusBar hidden={true} />
-      <View
-        style={[
-          styles.playerContainer,
-          { width: dimensions.width, height: dimensions.height },
-        ]}
+  return (
+    <>
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+        edges={['top', 'left', 'right']}
       >
-        <YoutubeIframe
-          ref={playerRef}
-          height={dimensions.height}
-          width={dimensions.width}
-          play={playing}
-          videoId={currentVideo?.videoId}
-          onChangeState={onStateChange}
-          initialPlayerParams={{
-            preventFullScreen: false,
-            controls: true,
-            showClosedCaptions: true,
-            modestbranding: true,
-            rel: false,
-          }}
-        />
-        <TouchableOpacity
-          style={styles.exitFullscreenButton}
-          onPress={toggleFullscreen}
-        >
-          <Icon name="fullscreen-exit" size={28} color="#FFFFFF" />
-        </TouchableOpacity>
-      </View>
-    </View>
-  ) : (
-    // Regular view with navigation
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top', 'left', 'right']}
-    >
-      {!isFullscreen && (
-        <CustomHeader title={currentVideo?.title || 'Video Player'} />
-      )}
-
-      <View
-        style={[
-          styles.playerContainer,
-          {
-            width: playerDimensions.width,
-            height: playerDimensions.height,
-          },
-        ]}
-      >
-        {loading && (
-          <View
-            style={[
-              styles.loadingOverlay,
-              { backgroundColor: theme.background },
-            ]}
-          >
-            <ActivityIndicator size="large" color={theme.primary} />
-          </View>
-        )}
-
-        <YoutubeIframe
-          ref={playerRef}
-          height={playerDimensions.height}
-          width={playerDimensions.width}
-          play={playing}
-          videoId={currentVideo?.videoId}
-          onChangeState={onStateChange}
-          initialPlayerParams={{
-            preventFullScreen: false,
-            controls: true,
-            showClosedCaptions: true,
-            modestbranding: true,
-            rel: false,
-          }}
-        />
-
         {!isFullscreen && (
-          <TouchableOpacity
-            style={styles.fullscreenButton}
-            onPress={toggleFullscreen}
-          >
-            <Icon name="fullscreen" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
+          <CustomHeader title={currentVideo?.title || 'Video Player'} />
         )}
-      </View>
 
-      {!isFullscreen && (
-        <>
-          <View style={styles.videoControls}>
-            <TouchableOpacity onPress={() => setPlaying(!playing)}>
-              <Icon
-                name={playing ? 'pause-circle' : 'play-circle'}
-                size={40}
-                color={theme.primary}
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.fullscreenTextButton}
-              onPress={toggleFullscreen}
-            >
-              <Icon name="fullscreen" size={24} color={theme.primary} />
-              <Text style={[styles.fullscreenText, { color: theme.text }]}>
-                Fullscreen
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <ScrollView
-            style={styles.contentScroll}
-            showsVerticalScrollIndicator={false}
-            ref={scrollViewRef}
-          >
-            <View style={styles.videoDetails}>
-              <Text style={[styles.videoTitle, { color: theme.text }]}>
-                {currentVideo?.title}
-              </Text>
-
-              <View style={styles.controlsRow}>
-                <View style={styles.viewsInfo}>
-                  <Icon
-                    name="eye-outline"
-                    size={16}
-                    color={theme.textSecondary}
-                  />
-                  <Text
-                    style={[styles.viewsText, { color: theme.textSecondary }]}
-                  >
-                    {currentVideo?.views || '100K'} views
-                  </Text>
-                </View>
-
-                <View style={styles.controls}>
-                  <TouchableOpacity
-                    style={styles.controlButton}
-                    onPress={() => setPlaying(!playing)}
-                  >
-                    <Icon
-                      name={playing ? 'pause' : 'play'}
-                      size={24}
-                      color={theme.primary}
-                    />
-                    <Text style={[styles.controlText, { color: theme.text }]}>
-                      {playing ? 'Pause' : 'Play'}
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.controlButton}
-                    onPress={() => setNotesModalVisible(true)}
-                  >
-                    <Icon
-                      name="note-text-outline"
-                      size={24}
-                      color={theme.primary}
-                    />
-                    <Text style={[styles.controlText, { color: theme.text }]}>
-                      Notes
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.controlButton}>
-                    <Icon
-                      name="content-save-outline"
-                      size={24}
-                      color={theme.primary}
-                    />
-                    <Text style={[styles.controlText, { color: theme.text }]}>
-                      Save
-                    </Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity style={styles.controlButton}>
-                    <Icon
-                      name="share-outline"
-                      size={24}
-                      color={theme.primary}
-                    />
-                    <Text style={[styles.controlText, { color: theme.text }]}>
-                      Share
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-
-            {playlist && (
-              <View
-                style={[
-                  styles.playlistInfo,
-                  { backgroundColor: `${theme.primary}15` },
-                ]}
-              >
-                <View style={styles.playlistHeader}>
-                  <Text style={[styles.playlistTitle, { color: theme.text }]}>
-                    From: {playlist.title}
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.viewPlaylistButton}
-                  >
-                    <Text
-                      style={[
-                        styles.viewPlaylistText,
-                        { color: theme.primary },
-                      ]}
-                    >
-                      View Playlist
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-                <Text
-                  style={[styles.channelName, { color: theme.textSecondary }]}
-                >
-                  {playlist.channelName}
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.relatedSection}>
-              <Text style={[styles.relatedTitle, { color: theme.text }]}>
-                Related Videos
-              </Text>
-
-              {relatedVideos.map(item => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={[
-                    styles.relatedVideoItem,
-                    { backgroundColor: theme.card },
-                  ]}
-                  onPress={() => {
-                    setCurrentVideo({
-                      ...item,
-                      title: item.title,
-                      videoId: item.videoId,
-                    });
-                    setPlaying(true);
-                    setLoading(true);
-                    // Scroll to top
-                    scrollViewRef.current?.scrollTo({ y: 0, animated: true });
-                  }}
-                >
-                  <View style={styles.relatedThumbnailContainer}>
-                    <Image
-                      source={{ uri: item.thumbnail }}
-                      style={styles.relatedThumbnail}
-                    />
-                    <View style={styles.relatedDurationBadge}>
-                      <Text style={styles.relatedDurationText}>
-                        {item.duration}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.relatedVideoInfo}>
-                    <Text
-                      style={[styles.relatedVideoTitle, { color: theme.text }]}
-                      numberOfLines={2}
-                    >
-                      {item.title}
-                    </Text>
-
-                    <Text
-                      style={[
-                        styles.relatedStatsText,
-                        { color: theme.textSecondary },
-                      ]}
-                    >
-                      {item.views} views • {item.publishedAt}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </ScrollView>
-
-          <Modal
-            visible={notesModalVisible}
-            animationType="fade"
-            transparent={true}
-            onRequestClose={() => setNotesModalVisible(false)}
-          >
+        <View
+          style={[
+            styles.playerContainer,
+            {
+              width: playerDimensions.width,
+              height: playerDimensions.height,
+            },
+          ]}
+        >
+          {loading && (
             <View
               style={[
-                styles.modalContainer,
-                { backgroundColor: 'rgba(0,0,0,0.5)' },
+                styles.loadingOverlay,
+                { backgroundColor: theme.background },
               ]}
             >
-              <View
-                style={[styles.modalContent, { backgroundColor: theme.card }]}
-              >
-                <Text style={[styles.modalTitle, { color: theme.text }]}>
-                  Add Notes
-                </Text>
-                <TextInput
-                  style={[
-                    styles.notesInput,
-                    {
-                      color: theme.text,
-                      backgroundColor: `${theme.background}50`,
-                    },
-                  ]}
-                  value={notes}
-                  onChangeText={setNotes}
-                  multiline
-                  placeholder="Write your notes here..."
-                  placeholderTextColor={`${theme.text}50`}
+              <ActivityIndicator size="large" color={theme.primary} />
+            </View>
+          )}
+
+          <YoutubeIframe
+            ref={playerRef}
+            height={playerDimensions.height}
+            width={playerDimensions.width}
+            play={playing}
+            videoId={currentVideo?.videoId}
+            onChangeState={onStateChange}
+            webViewProps={{
+              androidLayerType: 'hardware',
+              renderToHardwareTextureAndroid: true,
+            }}
+            initialPlayerParams={{
+              preventFullScreen: false,
+              controls: true,
+              showClosedCaptions: true,
+              modestbranding: false,
+              rel: false,
+              iv_load_policy: 1,
+              fs: 1,
+              playsinline: 0,
+              enablejsapi: 1,
+            }}
+          />
+
+          {!isFullscreen && (
+            <TouchableOpacity
+              style={styles.fullscreenButton}
+              onPress={toggleFullscreen}
+            >
+              <Icon name="fullscreen" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {!isFullscreen && (
+          <>
+            <View style={styles.videoControls}>
+              <TouchableOpacity onPress={() => setPlaying(!playing)}>
+                <Icon
+                  name={playing ? 'pause-circle' : 'play-circle'}
+                  size={40}
+                  color={theme.primary}
                 />
-                <View style={styles.notesActions}>
-                  <TouchableOpacity
-                    style={[
-                      styles.notesCancelButton,
-                      { borderColor: theme.textSecondary },
-                    ]}
-                    onPress={() => setNotesModalVisible(false)}
-                  >
-                    <Text style={{ color: theme.textSecondary }}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.notesSaveButton,
-                      { backgroundColor: theme.primary },
-                    ]}
-                    onPress={() => {
-                      // Save notes logic here
-                      setNotesModalVisible(false);
-                    }}
-                  >
-                    <Text style={{ color: '#FFFFFF' }}>Save</Text>
-                  </TouchableOpacity>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.fullscreenTextButton}
+                onPress={toggleFullscreen}
+              >
+                <Icon name="fullscreen" size={24} color={theme.primary} />
+                <Text style={[styles.fullscreenText, { color: theme.text }]}>
+                  Fullscreen
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.contentScroll}
+              showsVerticalScrollIndicator={false}
+              ref={scrollViewRef}
+            >
+              <View style={styles.videoDetails}>
+                <Text style={[styles.videoTitle, { color: theme.text }]}>
+                  {currentVideo?.title}
+                </Text>
+
+                <View style={styles.controlsRow}>
+                  <View style={styles.viewsInfo}>
+                    <Icon
+                      name="eye-outline"
+                      size={16}
+                      color={theme.textSecondary}
+                    />
+                    <Text
+                      style={[styles.viewsText, { color: theme.textSecondary }]}
+                    >
+                      {currentVideo?.views || '100K'} views
+                    </Text>
+                  </View>
+
+                  <View style={styles.controls}>
+                    <TouchableOpacity
+                      style={styles.controlButton}
+                      onPress={() => setPlaying(!playing)}
+                    >
+                      <Icon
+                        name={playing ? 'pause' : 'play'}
+                        size={24}
+                        color={theme.primary}
+                      />
+                      <Text style={[styles.controlText, { color: theme.text }]}>
+                        {playing ? 'Pause' : 'Play'}
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.controlButton}
+                      onPress={() => setNotesModalVisible(true)}
+                    >
+                      <Icon
+                        name="note-text-outline"
+                        size={24}
+                        color={theme.primary}
+                      />
+                      <Text style={[styles.controlText, { color: theme.text }]}>
+                        Notes
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.controlButton}>
+                      <Icon
+                        name="content-save-outline"
+                        size={24}
+                        color={theme.primary}
+                      />
+                      <Text style={[styles.controlText, { color: theme.text }]}>
+                        Save
+                      </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity style={styles.controlButton}>
+                      <Icon
+                        name="share-outline"
+                        size={24}
+                        color={theme.primary}
+                      />
+                      <Text style={[styles.controlText, { color: theme.text }]}>
+                        Share
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
-            </View>
-          </Modal>
-        </>
+
+              {playlist && (
+                <View
+                  style={[
+                    styles.playlistInfo,
+                    { backgroundColor: `${theme.primary}15` },
+                  ]}
+                >
+                  <View style={styles.playlistHeader}>
+                    <Text style={[styles.playlistTitle, { color: theme.text }]}>
+                      From: {playlist.title}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => navigation.goBack()}
+                      style={styles.viewPlaylistButton}
+                    >
+                      <Text
+                        style={[
+                          styles.viewPlaylistText,
+                          { color: theme.primary },
+                        ]}
+                      >
+                        View Playlist
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text
+                    style={[styles.channelName, { color: theme.textSecondary }]}
+                  >
+                    {playlist.channelName}
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.relatedSection}>
+                <Text style={[styles.relatedTitle, { color: theme.text }]}>
+                  Related Videos
+                </Text>
+
+                {relatedVideos.map(item => (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[
+                      styles.relatedVideoItem,
+                      { backgroundColor: theme.card },
+                    ]}
+                    onPress={() => {
+                      setCurrentVideo({
+                        ...item,
+                        title: item.title,
+                        videoId: item.videoId,
+                      });
+                      setPlaying(true);
+                      setLoading(true);
+                      // Scroll to top
+                      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+                    }}
+                  >
+                    <View style={styles.relatedThumbnailContainer}>
+                      <Image
+                        source={{ uri: item.thumbnail }}
+                        style={styles.relatedThumbnail}
+                      />
+                      <View style={styles.relatedDurationBadge}>
+                        <Text style={styles.relatedDurationText}>
+                          {item.duration}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.relatedVideoInfo}>
+                      <Text
+                        style={[
+                          styles.relatedVideoTitle,
+                          { color: theme.text },
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {item.title}
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.relatedStatsText,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {item.views} views • {item.publishedAt}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </ScrollView>
+
+            <Modal
+              visible={notesModalVisible}
+              animationType="fade"
+              transparent={true}
+              onRequestClose={() => setNotesModalVisible(false)}
+            >
+              <View
+                style={[
+                  styles.modalContainer,
+                  { backgroundColor: 'rgba(0,0,0,0.5)' },
+                ]}
+              >
+                <View
+                  style={[styles.modalContent, { backgroundColor: theme.card }]}
+                >
+                  <Text style={[styles.modalTitle, { color: theme.text }]}>
+                    Add Notes
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.notesInput,
+                      {
+                        color: theme.text,
+                        backgroundColor: `${theme.background}50`,
+                      },
+                    ]}
+                    value={notes}
+                    onChangeText={setNotes}
+                    multiline
+                    placeholder="Write your notes here..."
+                    placeholderTextColor={`${theme.text}50`}
+                  />
+                  <View style={styles.notesActions}>
+                    <TouchableOpacity
+                      style={[
+                        styles.notesCancelButton,
+                        { borderColor: theme.textSecondary },
+                      ]}
+                      onPress={() => setNotesModalVisible(false)}
+                    >
+                      <Text style={{ color: theme.textSecondary }}>Cancel</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.notesSaveButton,
+                        { backgroundColor: theme.primary },
+                      ]}
+                      onPress={() => {
+                        // Save notes logic here
+                        setNotesModalVisible(false);
+                      }}
+                    >
+                      <Text style={{ color: '#FFFFFF' }}>Save</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </Modal>
+          </>
+        )}
+      </SafeAreaView>
+
+      {isFullscreen && (
+        <Modal
+          visible={true}
+          transparent={false}
+          animationType="fade"
+          onRequestClose={toggleFullscreen}
+          supportedOrientations={['landscape']}
+          statusBarTranslucent={true}
+        >
+          <View style={styles.fullscreenWrapper}>
+            <StatusBar hidden={true} />
+            <YoutubeIframe
+              ref={playerRef}
+              height={dimensions.height}
+              width={dimensions.width}
+              play={playing}
+              videoId={currentVideo?.videoId}
+              onChangeState={onStateChange}
+              webViewProps={{
+                androidLayerType: 'hardware',
+                renderToHardwareTextureAndroid: true,
+              }}
+              initialPlayerParams={{
+                preventFullScreen: false,
+                controls: true,
+                showClosedCaptions: true,
+                modestbranding: false,
+                rel: false,
+                iv_load_policy: 1,
+                fs: 1, // Enable fullscreen button
+                playsinline: 0, // Allow fullscreen playback
+                enablejsapi: 1,
+              }}
+            />
+            <TouchableOpacity
+              style={styles.exitFullscreenButton}
+              onPress={toggleFullscreen}
+            >
+              <Icon name="fullscreen-exit" size={28} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
+        </Modal>
       )}
-    </SafeAreaView>
+    </>
   );
 };
 
@@ -719,7 +742,9 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: '#000',
-    zIndex: 1000,
+    zIndex: 9999,
+    elevation: 9999,
+    flex: 1,
   },
   exitFullscreenButton: {
     position: 'absolute',
