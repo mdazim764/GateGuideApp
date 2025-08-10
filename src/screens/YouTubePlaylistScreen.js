@@ -7,11 +7,16 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Dimensions,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ThemeContext } from '../theme/ThemeContext';
 import CustomHeader from '../components/CustomHeader';
+
+const { width } = Dimensions.get('window');
+const CARD_WIDTH = width - 32; // Full width minus padding
 
 const YouTubePlaylistScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
@@ -20,6 +25,7 @@ const YouTubePlaylistScreen = ({ navigation, route }) => {
   const [playlists, setPlaylists] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const scrollY = new Animated.Value(0);
 
   useEffect(() => {
     // Mock API call to fetch YouTube playlists
@@ -93,34 +99,115 @@ const YouTubePlaylistScreen = ({ navigation, route }) => {
     navigation.navigate('YouTubeVideoList', { playlist });
   };
 
-  const renderPlaylistItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.playlistItem, { backgroundColor: theme.card }]}
-      onPress={() => navigateToVideoList(item)}
-    >
-      <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
-      <View style={styles.playlistInfo}>
-        <Text
-          style={[styles.playlistTitle, { color: theme.text }]}
-          numberOfLines={2}
+  // New animation for card press
+  const animatePress = index => {
+    const scaleAnim = new Animated.Value(1);
+
+    Animated.sequence([
+      Animated.timing(scaleAnim, {
+        toValue: 0.95,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scaleAnim, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start(() => navigateToVideoList(playlists[index]));
+  };
+
+  const renderPlaylistItem = ({ item, index }) => {
+    const inputRange = [-1, 0, index * 200, (index + 1) * 200];
+
+    // Animated values for scroll effects
+    const scale = scrollY.interpolate({
+      inputRange,
+      outputRange: [1, 1, 1, 0.95],
+      extrapolate: 'clamp',
+    });
+
+    const opacity = scrollY.interpolate({
+      inputRange,
+      outputRange: [1, 1, 1, 0.8],
+      extrapolate: 'clamp',
+    });
+
+    return (
+      <Animated.View
+        style={[
+          styles.cardContainer,
+          {
+            transform: [{ scale }],
+            opacity,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[styles.playlistCard, { backgroundColor: theme.card }]}
+          activeOpacity={0.8}
+          onPress={() => animatePress(index)}
         >
-          {item.title}
-        </Text>
-        <Text style={[styles.channelName, { color: theme.textSecondary }]}>
-          {item.channelName}
-        </Text>
-        <View style={styles.statsRow}>
-          <Text style={[styles.statsText, { color: theme.textSecondary }]}>
-            {item.videoCount} videos
-          </Text>
-          <Text style={[styles.statsText, { color: theme.textSecondary }]}>
-            {item.views} views
-          </Text>
-        </View>
-      </View>
-      <Icon name="chevron-right" size={24} color={theme.textSecondary} />
-    </TouchableOpacity>
-  );
+          <Image
+            source={{ uri: item.thumbnail }}
+            style={styles.thumbnailImg}
+            resizeMode="cover"
+          />
+          <View style={styles.overlayGradient}>
+            <View style={styles.playlistBadge}>
+              <Icon name="youtube" size={14} color="#FFFFFF" />
+              <Text style={styles.playlistBadgeText}>
+                {item.videoCount} videos
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.contentContainer}>
+            <View style={styles.titleRow}>
+              <Text
+                style={[styles.playlistTitle, { color: theme.text }]}
+                numberOfLines={1}
+              >
+                {item.title}
+              </Text>
+              <Icon name="playlist-play" size={24} color={theme.primary} />
+            </View>
+
+            <Text
+              style={[styles.channelName, { color: theme.textSecondary }]}
+              numberOfLines={1}
+            >
+              {item.channelName}
+            </Text>
+
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Icon
+                  name="eye-outline"
+                  size={16}
+                  color={theme.textSecondary}
+                />
+                <Text style={[styles.statText, { color: theme.textSecondary }]}>
+                  {item.views}
+                </Text>
+              </View>
+              <View style={styles.separator} />
+              <View style={styles.statItem}>
+                <Icon
+                  name="clock-outline"
+                  size={16}
+                  color={theme.textSecondary}
+                />
+                <Text style={[styles.statText, { color: theme.textSecondary }]}>
+                  {new Date(item.updatedAt).toLocaleDateString()}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Animated.View>
+    );
+  };
 
   return (
     <SafeAreaView
@@ -162,18 +249,38 @@ const YouTubePlaylistScreen = ({ navigation, route }) => {
         </View>
       ) : (
         <>
-          <View style={styles.infoContainer}>
-            <Text style={[styles.infoText, { color: theme.text }]}>
-              Select a playlist to browse videos
-            </Text>
+          <View style={styles.headerContainer}>
+            <View style={styles.headerTextContainer}>
+              <Text style={[styles.headerTitle, { color: theme.text }]}>
+                Educational Playlists
+              </Text>
+              <Text
+                style={[styles.headerSubtitle, { color: theme.textSecondary }]}
+              >
+                {playlists.length} playlists available
+              </Text>
+            </View>
+            <View
+              style={[
+                styles.headerIconContainer,
+                { backgroundColor: `${theme.primary}20` },
+              ]}
+            >
+              <Icon name="youtube" size={28} color="#FF0000" />
+            </View>
           </View>
 
-          <FlatList
+          <Animated.FlatList
             data={playlists}
             renderItem={renderPlaylistItem}
             keyExtractor={item => item.id}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+              { useNativeDriver: true },
+            )}
             ListEmptyComponent={
               <View style={styles.centerContainer}>
                 <Icon
@@ -206,6 +313,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
+    fontWeight: '500',
   },
   errorText: {
     marginTop: 16,
@@ -213,8 +321,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   retryButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
     borderRadius: 8,
     marginTop: 16,
   },
@@ -222,53 +330,117 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
-  infoContainer: {
-    padding: 16,
-    paddingBottom: 8,
+  headerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 8,
   },
-  infoText: {
-    fontSize: 16,
+  headerTextContainer: {
+    flex: 1,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  headerIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   listContent: {
-    padding: 16,
-    paddingTop: 8,
+    paddingHorizontal: 16,
+    paddingBottom: 24,
   },
-  playlistItem: {
-    flexDirection: 'row',
-    borderRadius: 12,
+  cardContainer: {
     marginBottom: 16,
+    borderRadius: 16,
     overflow: 'hidden',
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  thumbnail: {
-    width: 120,
-    height: 80,
-    resizeMode: 'cover',
+  playlistCard: {
+    width: CARD_WIDTH,
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  playlistInfo: {
-    flex: 1,
+  thumbnailImg: {
+    width: '100%',
+    height: 180,
+  },
+  overlayGradient: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 180,
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    justifyContent: 'flex-end',
+    alignItems: 'flex-end',
     padding: 12,
+  },
+  playlistBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+  playlistBadgeText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+    fontSize: 12,
+    marginLeft: 4,
+  },
+  contentContainer: {
+    padding: 16,
+  },
+  titleRow: {
+    flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   playlistTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: '600',
+    flex: 1,
   },
   channelName: {
     fontSize: 14,
-    marginBottom: 4,
+    marginBottom: 12,
+    fontWeight: '500',
   },
-  statsRow: {
+  statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  statsText: {
-    fontSize: 12,
+  statItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statText: {
+    marginLeft: 4,
+    fontSize: 13,
+  },
+  separator: {
+    width: 1,
+    height: 12,
+    backgroundColor: '#CCCCCC',
+    opacity: 0.6,
+    marginHorizontal: 12,
   },
   emptyText: {
     marginTop: 16,
