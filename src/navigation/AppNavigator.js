@@ -121,17 +121,14 @@ const ResourcesStack = createStackNavigator();
 const ResourcesStackScreen = () => (
   <ResourcesStack.Navigator screenOptions={{ headerShown: false }}>
     <ResourcesStack.Screen name="Resources" component={ResourcesScreen} />
-    <ResourcesStack.Screen
-      name="YouTubePlaylist"
-      component={YouTubePlaylistScreen}
-    />
-    <ResourcesStack.Screen
-      name="YouTubeVideoList"
-      component={YouTubeVideoListScreen}
-    />
-    <ResourcesStack.Screen
-      name="YouTubePlayer"
-      component={YouTubePlayerScreen}
+    <ResourcesStack.Screen name="YouTubePlaylist" component={YouTubePlaylistScreen} />
+    <ResourcesStack.Screen name="YouTubeVideoList" component={YouTubeVideoListScreen} />
+    <ResourcesStack.Screen 
+      name="YouTubePlayer" 
+      component={YouTubePlayerScreen} 
+      options={({ route }) => ({
+        tabBarVisible: route.params?.hideTabBar === true ? false : true,
+      })}
     />
   </ResourcesStack.Navigator>
 );

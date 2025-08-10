@@ -19,7 +19,7 @@ import {
   StatusBar,
   BackHandler,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ThemeContext } from '../theme/ThemeContext';
 import YoutubeIframe from 'react-native-youtube-iframe';
@@ -139,12 +139,16 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
       Orientation.lockToPortrait();
       setIsFullscreen(false);
       StatusBar.setHidden(false);
+      // Show the tab bar when exiting fullscreen
+      navigation.setParams({ hideTabBar: false });
     } else {
       Orientation.lockToLandscape();
       setIsFullscreen(true);
       StatusBar.setHidden(true);
+      // Hide the tab bar when entering fullscreen
+      navigation.setParams({ hideTabBar: true });
     }
-  }, [isFullscreen]);
+  }, [isFullscreen, navigation]);
 
   // Calculate player dimensions based on orientation
   const getPlayerDimensions = () => {
@@ -165,14 +169,44 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
 
   const playerDimensions = getPlayerDimensions();
 
-  return (
+  return isFullscreen ? (
+    // Fullscreen mode - completely detached from navigation
+    <View style={styles.fullscreenWrapper}>
+      <StatusBar hidden={true} />
+      <View
+        style={[
+          styles.playerContainer,
+          { width: dimensions.width, height: dimensions.height },
+        ]}
+      >
+        <YoutubeIframe
+          ref={playerRef}
+          height={dimensions.height}
+          width={dimensions.width}
+          play={playing}
+          videoId={currentVideo?.videoId}
+          onChangeState={onStateChange}
+          initialPlayerParams={{
+            preventFullScreen: false,
+            controls: true,
+            showClosedCaptions: true,
+            modestbranding: true,
+            rel: false,
+          }}
+        />
+        <TouchableOpacity
+          style={styles.exitFullscreenButton}
+          onPress={toggleFullscreen}
+        >
+          <Icon name="fullscreen-exit" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+    </View>
+  ) : (
+    // Regular view with navigation
     <SafeAreaView
-      style={[
-        styles.container,
-        { backgroundColor: theme.background },
-        isFullscreen && styles.fullscreenContainer,
-      ]}
-      edges={isFullscreen ? [] : ['top', 'left', 'right']}
+      style={[styles.container, { backgroundColor: theme.background }]}
+      edges={['top', 'left', 'right']}
     >
       {!isFullscreen && (
         <CustomHeader title={currentVideo?.title || 'Video Player'} />
@@ -677,6 +711,24 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
+  },
+  fullscreenWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#000',
+    zIndex: 1000,
+  },
+  exitFullscreenButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 24,
+    padding: 8,
+    zIndex: 1001,
   },
 });
 
