@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ThemeContext } from '../theme/ThemeContext';
+import CustomHeader from '../components/CustomHeader'; // Import your custom header
 
 const { width } = Dimensions.get('window');
 
@@ -335,11 +336,25 @@ const ResourcesScreen = ({ navigation, route }) => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.text }]}>
-          Study Resources
+      <CustomHeader title="Resources" />
+      
+      {/* Add a section for YouTube content */}
+      <View style={styles.section}>
+        <Text style={[styles.sectionTitle, {color: theme.text}]}>
+          Video Tutorials
         </Text>
+        <TouchableOpacity 
+          style={[styles.resourceCard, {backgroundColor: theme.card}]}
+          onPress={() => navigation.navigate('YouTubePlaylist')}
+        >
+          <Icon name="youtube" size={24} color="red" />
+          <Text style={[styles.resourceText, {color: theme.text}]}>
+            Educational Playlists
+          </Text>
+          <Icon name="chevron-right" size={20} color={theme.text} />
+        </TouchableOpacity>
       </View>
+      
       <View
         style={[styles.searchContainer, { backgroundColor: `${theme.text}10` }]}
       >
@@ -715,6 +730,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#302f2fff',
     // padding: 4,
+  },
+  section: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderColor: 'transparent',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  resourceCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#151010ff',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    marginBottom: 16,
+  },
+  resourceText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
   },
 });
 
