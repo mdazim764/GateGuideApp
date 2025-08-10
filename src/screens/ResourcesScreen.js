@@ -336,7 +336,7 @@ const ResourcesScreen = ({ navigation, route }) => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <CustomHeader title="Resources" />
+      {/* <CustomHeader title="Resources" /> */}
 
       {/* Add a section for YouTube content */}
       <View style={styles.section}>
@@ -522,7 +522,7 @@ const ResourcesScreen = ({ navigation, route }) => {
       </View>
       <TouchableOpacity
         style={[styles.fabButton, { backgroundColor: theme.primary }]}
-        onPress={() => console.log('Request new resource')}
+        onPress={() => navigation.navigate('AddResource')}
       >
         <Icon name="plus" size={24} color="#FFFFFF" />
       </TouchableOpacity>
@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     borderRadius: 12,
     marginHorizontal: 16,
-    marginTop: 8,
+    // marginTop: 8,
     marginBottom: 16,
     height: 44,
   },
@@ -752,7 +752,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    marginBottom: 16,
+    // marginBottom: 16,
   },
   resourceText: {
     flex: 1,

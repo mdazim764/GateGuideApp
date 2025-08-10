@@ -139,14 +139,16 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
       Orientation.lockToPortrait();
       setIsFullscreen(false);
       StatusBar.setHidden(false);
-      // Show the tab bar when exiting fullscreen
-      navigation.setParams({ hideTabBar: false });
+      // Force player to rerender
+      setLoading(true);
+      setTimeout(() => setLoading(false), 300);
     } else {
       Orientation.lockToLandscape();
       setIsFullscreen(true);
       StatusBar.setHidden(true);
-      // Hide the tab bar when entering fullscreen
-      navigation.setParams({ hideTabBar: true });
+      // Force player to rerender
+      setLoading(true);
+      setTimeout(() => setLoading(false), 300);
     }
   }, [isFullscreen, navigation]);
 
@@ -209,6 +211,11 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
             webViewProps={{
               androidLayerType: 'hardware',
               renderToHardwareTextureAndroid: true,
+              javaScriptEnabled: true, // Make sure JavaScript is enabled
+              domStorageEnabled: true, // Enable DOM storage
+              allowsFullscreenVideo: true, // Allow video to enter fullscreen mode
+              mediaPlaybackRequiresUserAction: false, // Allow autoplay
+              allowsInlineMediaPlayback: true, // Allow inline playback
             }}
             initialPlayerParams={{
               preventFullScreen: false,
@@ -219,7 +226,9 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
               iv_load_policy: 1,
               fs: 1,
               playsinline: 0,
+              autoplay: 0, // Add this to ensure controls show up initially
               enablejsapi: 1,
+              origin: 'https://www.youtube.com', // Add this for better control compatibility
             }}
           />
 
@@ -510,6 +519,11 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
               webViewProps={{
                 androidLayerType: 'hardware',
                 renderToHardwareTextureAndroid: true,
+                javaScriptEnabled: true, // Make sure JavaScript is enabled
+                domStorageEnabled: true, // Enable DOM storage
+                allowsFullscreenVideo: true, // Allow video to enter fullscreen mode
+                mediaPlaybackRequiresUserAction: false, // Allow autoplay
+                allowsInlineMediaPlayback: true, // Allow inline playback
               }}
               initialPlayerParams={{
                 preventFullScreen: false,
@@ -518,9 +532,11 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
                 modestbranding: false,
                 rel: false,
                 iv_load_policy: 1,
-                fs: 1, // Enable fullscreen button
-                playsinline: 0, // Allow fullscreen playback
+                fs: 1,
+                playsinline: 0,
+                autoplay: 0, // Add this to ensure controls show up initially
                 enablejsapi: 1,
+                origin: 'https://www.youtube.com', // Add this for better control compatibility
               }}
             />
             <TouchableOpacity
@@ -529,6 +545,17 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
             >
               <Icon name="fullscreen-exit" size={28} color="#FFFFFF" />
             </TouchableOpacity>
+
+            {/* Add this overlay controls container */}
+            <View style={styles.fullscreenControls}>
+              <TouchableOpacity onPress={() => setPlaying(!playing)}>
+                <Icon
+                  name={playing ? 'pause-circle' : 'play-circle'}
+                  size={50}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </Modal>
       )}
@@ -745,6 +772,7 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     elevation: 9999,
     flex: 1,
+    paddingBottom: 20, // Add padding to make room for controls
   },
   exitFullscreenButton: {
     position: 'absolute',
@@ -754,6 +782,16 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     padding: 8,
     zIndex: 1001,
+  },
+  fullscreenControls: {
+    position: 'absolute',
+    bottom: 50,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
   },
 });
 
