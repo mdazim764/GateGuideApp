@@ -1,295 +1,188 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import {
   View,
   Text,
-  StyleSheet,
   FlatList,
-  TouchableOpacity,
   Image,
+  StyleSheet,
+  TouchableOpacity,
   ActivityIndicator,
-  Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ThemeContext } from '../theme/ThemeContext';
 import CustomHeader from '../components/CustomHeader';
-
-const { width } = Dimensions.get('window');
+import api from '../services/api';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const YouTubeVideoListScreen = ({ navigation, route }) => {
+  const { playlist } = route.params;
   const { theme } = useContext(ThemeContext);
-  const { playlist } = route.params || {};
-
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Load video data for this playlist - replace with actual API call later
-    const fetchVideos = async () => {
-      try {
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        const dummyVideos = [
-          {
-            id: '1',
-            title:
-              'Introduction to Operating Systems: Processes, Memory and File Systems',
-            videoId: 'dQw4w9WgXcQ',
-            thumbnail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/maxresdefault.jpg',
-            duration: '10:15',
-            views: '120K',
-            publishedAt: '2 weeks ago',
-            description:
-              'This video covers the basics of operating systems including processes, scheduling algorithms, memory management, and file systems.',
-          },
-          {
-            id: '2',
-            title:
-              'Process Scheduling Algorithms: FCFS, SJF, Round Robin and Priority Scheduling',
-            videoId: 'xvFZjo5PgG0',
-            thumbnail: 'https://i.ytimg.com/vi/xvFZjo5PgG0/maxresdefault.jpg',
-            duration: '15:32',
-            views: '85K',
-            publishedAt: '1 month ago',
-            description:
-              'Learn about different CPU scheduling algorithms used in operating systems.',
-          },
-          {
-            id: '3',
-            title: 'Memory Management: Paging, Segmentation and Virtual Memory',
-            videoId: 'oHg5SJYRHA0',
-            thumbnail: 'https://i.ytimg.com/vi/oHg5SJYRHA0/maxresdefault.jpg',
-            duration: '12:47',
-            views: '200K',
-            publishedAt: '3 weeks ago',
-            description:
-              'Understand how operating systems manage memory through paging and segmentation.',
-          },
-          {
-            id: '4',
-            title: 'File Systems: Organization, Access Methods and Allocation',
-            videoId: 'V_OVxxIEbDQ',
-            thumbnail: 'https://i.ytimg.com/vi/V_OVxxIEbDQ/maxresdefault.jpg',
-            duration: '18:10',
-            views: '75K',
-            publishedAt: '1 month ago',
-            description:
-              'Explore file system concepts including allocation methods, directory structure, and access mechanisms.',
-          },
-          {
-            id: '5',
-            title: 'Deadlocks: Detection, Prevention and Recovery',
-            videoId: 'IQ7CrXjjYbQ',
-            thumbnail: 'https://i.ytimg.com/vi/IQ7CrXjjYbQ/maxresdefault.jpg',
-            duration: '14:23',
-            views: '95K',
-            publishedAt: '2 months ago',
-            description:
-              'Learn about deadlock conditions, detection algorithms, and recovery strategies.',
-          },
-          {
-            id: '6',
-            title: 'I/O Systems: Hardware, Software and Performance',
-            videoId: 'fUB8YvJRMZA',
-            thumbnail: 'https://i.ytimg.com/vi/fUB8YvJRMZA/maxresdefault.jpg',
-            duration: '16:55',
-            views: '62K',
-            publishedAt: '3 months ago',
-            description:
-              'Understanding input/output systems in operating systems and related performance considerations.',
-          },
-        ];
-
-        setVideos(dummyVideos);
-        setLoading(false);
-      } catch (err) {
-        console.error('Error fetching videos:', err);
-        setError('Failed to load videos. Please try again.');
-        setLoading(false);
-      }
-    };
-
     fetchVideos();
-  }, [playlist]);
+  }, [playlist.playlistId]);
 
-  const renderVideoItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.videoCard, { backgroundColor: theme.card }]}
-      activeOpacity={0.8}
-      onPress={() =>
-        navigation.navigate('YouTubePlayer', { video: item, playlist })
+  const fetchVideos = async () => {
+    try {
+      setLoading(true);
+      console.log('Fetching videos for playlist:', playlist.playlistId);
+
+      const response = await api.youtube.getPlaylistVideos(playlist.playlistId);
+      console.log('API response:', response);
+
+      // FIXED: Extract videos array from the response
+      if (response.data && response.data.videos && Array.isArray(response.data.videos)) {
+        console.log('Found videos:', response.data.videos.length);
+        setVideos(response.data.videos);
+      } else {
+        console.warn('Invalid response format or no videos found:', response);
+        setVideos([]);
+        setError('No videos found in this playlist.');
       }
-    >
-      <View style={styles.thumbnailContainer}>
-        <Image
-          source={{ uri: item.thumbnail }}
-          style={styles.thumbnail}
-          resizeMode="cover"
-        />
-        <View style={styles.durationBadge}>
-          <Text style={styles.durationText}>{item.duration}</Text>
-        </View>
-        <View style={styles.playIconContainer}>
-          <Icon name="play-circle" size={36} color="#FFFFFF" />
-        </View>
-      </View>
+    } catch (err) {
+      console.error('Error fetching videos:', err);
+      setError('Failed to load videos. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-      <View style={styles.videoDetails}>
-        <Text
-          style={[styles.videoTitle, { color: theme.text }]}
-          numberOfLines={2}
-        >
-          {item.title}
-        </Text>
+  const formatDuration = (duration) => {
+    if (!duration) return 'Unknown';
 
-        <View style={styles.videoMeta}>
-          <View style={styles.metaItem}>
-            <Icon name="eye-outline" size={14} color={theme.textSecondary} />
-            <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-              {item.views}
+    // Convert ISO duration or seconds to readable format
+    if (typeof duration === 'string' && duration.includes('PT')) {
+      // Parse ISO 8601 duration format
+      const matches = duration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+      if (!matches) return duration;
+
+      const hours = matches[1] ? parseInt(matches[1]) : 0;
+      const minutes = matches[2] ? parseInt(matches[2]) : 0;
+      const seconds = matches[3] ? parseInt(matches[3]) : 0;
+
+      if (hours > 0) {
+        return `${hours}:${minutes.toString().padStart(2, '0')}:${seconds
+          .toString()
+          .padStart(2, '0')}`;
+      } else {
+        return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+      }
+    } else if (typeof duration === 'number') {
+      // Convert seconds to format
+      const mins = Math.floor(duration / 60);
+      const secs = Math.floor(duration % 60);
+      return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    return duration;
+  };
+
+  // Update renderVideoItem to handle missing properties gracefully
+  const renderVideoItem = ({ item }) => {
+    // Fix 2: Add validation and debug logging for each item
+    console.log("Rendering video item:", item);
+    
+    if (!item || !item.title) {
+      console.warn("Invalid video item:", item);
+      return null; // Skip rendering invalid items
+    }
+    
+    return (
+      <TouchableOpacity
+        style={[styles.videoItem, { backgroundColor: theme.card }]}
+        onPress={() =>
+          navigation.navigate('YouTubePlayer', { video: item, playlist: playlist })
+        }
+      >
+        <View style={styles.thumbnailContainer}>
+          <Image
+            source={{ 
+              uri: item.thumbnailUrl || 'https://via.placeholder.com/320x180?text=No+Thumbnail' 
+            }}
+            style={styles.thumbnail}
+            resizeMode="cover"
+            // Fix 3: Add onError handler for image loading failures
+            onError={(e) => console.warn("Image failed to load:", e.nativeEvent.error)}
+          />
+          {item.duration && (
+            <View style={styles.durationBadge}>
+              <Text style={styles.durationText}>
+                {formatDuration(item.duration)}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <View style={styles.videoInfo}>
+          <Text style={[styles.videoTitle, { color: theme.text }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+
+          <View style={styles.videoDetails}>
+            <Text style={[styles.channelName, { color: theme.textSecondary }]}>
+              {item.channelTitle || playlist.channelName || "Unknown channel"}
             </Text>
-          </View>
 
-          <View style={styles.metaSeparator} />
-
-          <View style={styles.metaItem}>
-            <Icon name="clock-outline" size={14} color={theme.textSecondary} />
-            <Text style={[styles.metaText, { color: theme.textSecondary }]}>
-              {item.publishedAt}
-            </Text>
+            {item.viewCount && (
+              <View style={styles.viewsContainer}>
+                <Icon name="eye-outline" size={14} color={theme.textSecondary} />
+                <Text style={[styles.viewCount, { color: theme.textSecondary }]}>
+                  {Number(item.viewCount).toLocaleString()} views
+                </Text>
+              </View>
+            )}
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
-      <CustomHeader title={playlist?.title || 'Videos'} />
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <CustomHeader
+        title={playlist.title}
+        subtitle={playlist.channelName}
+        navigation={navigation}
+        route={route}
+      />
 
       {loading ? (
-        <View style={styles.centerContent}>
+        <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
-          <Text style={[styles.statusText, { color: theme.textSecondary }]}>
-            Loading videos...
-          </Text>
         </View>
       ) : error ? (
-        <View style={styles.centerContent}>
-          <Icon name="alert-circle-outline" size={48} color="#E53935" />
-          <Text style={[styles.statusText, { color: theme.text }]}>
-            {error}
-          </Text>
+        <View style={styles.errorContainer}>
+          <Icon name="alert-circle-outline" size={48} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.text }]}>{error}</Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: theme.primary }]}
-            onPress={() => {
-              setLoading(true);
-              setError(null);
-              setTimeout(() => setLoading(false), 1000);
-            }}
+            onPress={fetchVideos}
           >
-            <Text style={styles.retryButtonText}>Retry</Text>
+            <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <>
-          <View
-            style={[styles.playlistInfoCard, { backgroundColor: theme.card }]}
-          >
-            <View style={styles.playlistHeader}>
-              {playlist?.thumbnail ? (
-                <Image
-                  source={{ uri: playlist.thumbnail }}
-                  style={styles.playlistThumbnail}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.playlistThumbnailFallback,
-                    { backgroundColor: `${theme.primary}20` },
-                  ]}
-                >
-                  <Icon name="playlist-play" size={32} color={theme.primary} />
-                </View>
-              )}
-
-              <View style={styles.playlistInfo}>
-                <Text style={[styles.playlistTitle, { color: theme.text }]}>
-                  {playlist?.title || 'Playlist'}
-                </Text>
-                <Text
-                  style={[styles.channelName, { color: theme.textSecondary }]}
-                >
-                  {playlist?.channelName || 'Channel name'}
-                </Text>
-                <Text
-                  style={[styles.playlistStats, { color: theme.textSecondary }]}
-                >
-                  {playlist?.videoCount || videos.length} videos •{' '}
-                  {playlist?.views || '100K'} views
-                </Text>
-              </View>
+        <FlatList
+          data={videos}
+          keyExtractor={(item) => item.id || String(Math.random())} // Fix 4: Add fallback for missing IDs
+          renderItem={renderVideoItem}
+          contentContainerStyle={styles.listContent}
+          // Fix 5: Add these additional props for better debugging
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Icon name="playlist-remove" size={48} color={theme.textSecondary} />
+              <Text style={[styles.emptyText, { color: theme.text }]}>
+                No videos found in this playlist
+              </Text>
             </View>
-
-            <View style={styles.playlistActions}>
-              <TouchableOpacity
-                style={[
-                  styles.primaryButton,
-                  { backgroundColor: theme.primary },
-                ]}
-                onPress={() => {
-                  if (videos.length > 0) {
-                    navigation.navigate('YouTubePlayer', {
-                      video: videos[0],
-                      playlist,
-                    });
-                  }
-                }}
-              >
-                <Icon name="play" size={16} color="#FFFFFF" />
-                <Text style={styles.primaryButtonText}>Play All</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.secondaryButton, { borderColor: theme.primary }]}
-              >
-                <Icon name="shuffle" size={16} color={theme.primary} />
-                <Text
-                  style={[styles.secondaryButtonText, { color: theme.primary }]}
-                >
-                  Shuffle
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          <FlatList
-            data={videos}
-            renderItem={renderVideoItem}
-            keyExtractor={item => item.id}
-            contentContainerStyle={styles.videoList}
-            showsVerticalScrollIndicator={false}
-            ListEmptyComponent={
-              <View style={styles.centerContent}>
-                <Icon
-                  name="playlist-remove"
-                  size={48}
-                  color={theme.textSecondary}
-                />
-                <Text style={[styles.statusText, { color: theme.text }]}>
-                  No videos in this playlist
-                </Text>
-              </View>
-            }
-          />
-        </>
+          )}
+          onRefresh={fetchVideos}
+          refreshing={loading}
+        />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -297,108 +190,35 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  centerContent: {
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
   },
-  statusText: {
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
     fontSize: 16,
-    marginTop: 16,
     textAlign: 'center',
+    marginVertical: 16,
   },
   retryButton: {
-    marginTop: 16,
-    paddingVertical: 10,
     paddingHorizontal: 20,
-    borderRadius: 8,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-  },
-  playlistInfoCard: {
-    margin: 16,
-    marginBottom: 8,
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  playlistHeader: {
-    flexDirection: 'row',
-    padding: 16,
-  },
-  playlistThumbnail: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-  },
-  playlistThumbnailFallback: {
-    width: 80,
-    height: 80,
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  playlistInfo: {
-    marginLeft: 12,
-    flex: 1,
-    justifyContent: 'center',
-  },
-  playlistTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 4,
-  },
-  channelName: {
-    fontSize: 14,
-    marginBottom: 4,
-  },
-  playlistStats: {
-    fontSize: 12,
-  },
-  playlistActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  primaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 10,
-    paddingHorizontal: 16,
     borderRadius: 8,
-    marginRight: 12,
   },
-  primaryButtonText: {
+  retryText: {
     color: '#FFFFFF',
-    fontWeight: '600',
-    marginLeft: 8,
+    fontWeight: '500',
   },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 9,
-    paddingHorizontal: 16,
+  videoItem: {
+    marginHorizontal: 16,
+    marginVertical: 8,
     borderRadius: 8,
-    borderWidth: 1,
-  },
-  secondaryButtonText: {
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  videoList: {
-    padding: 16,
-    paddingTop: 8,
-  },
-  videoCard: {
-    borderRadius: 12,
-    marginBottom: 16,
     overflow: 'hidden',
     elevation: 2,
     shadowColor: '#000',
@@ -408,20 +228,19 @@ const styles = StyleSheet.create({
   },
   thumbnailContainer: {
     position: 'relative',
-    width: '100%',
-    height: 180,
   },
   thumbnail: {
     width: '100%',
-    height: '100%',
+    height: 180,
+    backgroundColor: '#333',
   },
   durationBadge: {
     position: 'absolute',
     right: 8,
     bottom: 8,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingVertical: 2,
+    backgroundColor: 'rgba(0,0,0,0.8)',
     paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 4,
   },
   durationText: {
@@ -429,43 +248,44 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  playIconContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-  },
-  videoDetails: {
+  videoInfo: {
     padding: 12,
   },
   videoTitle: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     marginBottom: 8,
-    lineHeight: 22,
   },
-  videoMeta: {
+  videoDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  channelName: {
+    fontSize: 14,
+  },
+  viewsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    fontSize: 13,
+  viewCount: {
+    fontSize: 12,
     marginLeft: 4,
   },
-  metaSeparator: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#D0D0D0',
-    marginHorizontal: 8,
+  listContent: {
+    paddingVertical: 8,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    marginTop: 50,
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
   },
 });
 

@@ -33,7 +33,11 @@ const MoreScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <CustomHeader title="Menue" onBack={() => navigation.goBack()} />
+      <CustomHeader
+        title="Menue"
+        navigation={navigation}
+        onBack={() => navigation.goBack()}
+      />
       <ScrollView style={{ flex: 1, backgroundColor: theme.background }}>
         {menuItems.map((item, idx) => (
           <TouchableOpacity

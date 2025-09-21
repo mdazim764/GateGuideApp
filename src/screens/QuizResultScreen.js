@@ -199,7 +199,11 @@ const QuizResultScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <CustomHeader title="Quiz Results" onBack={() => navigation.goBack()} />
+      <CustomHeader
+        title="Quiz Results"
+        navigation={navigation}
+        onBack={() => navigation.goBack()}
+      />
       <ScrollView>
         <View style={styles.content}>
           {/* Score Circle */}

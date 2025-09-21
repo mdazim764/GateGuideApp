@@ -18,13 +18,15 @@ import {
   TextInput,
   StatusBar,
   BackHandler,
+  FlatList,
 } from 'react-native';
-import { SafeAreaView, SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ThemeContext } from '../theme/ThemeContext';
 import YoutubeIframe from 'react-native-youtube-iframe';
 import CustomHeader from '../components/CustomHeader';
 import Orientation from 'react-native-orientation-locker';
+import api from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -41,6 +43,9 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
   const [orientation, setOrientation] = useState('PORTRAIT');
   const [dimensions, setDimensions] = useState(Dimensions.get('window'));
   const [relatedVideos, setRelatedVideos] = useState([]);
+  const [playlistVideos, setPlaylistVideos] = useState([]);
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(0);
+  const [playlistLoading, setPlaylistLoading] = useState(false);
 
   const scrollViewRef = useRef(null);
   const playerRef = useRef(null);
@@ -86,15 +91,6 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
         views: '210K',
         publishedAt: '2 months ago',
       },
-      {
-        id: '4',
-        title: 'Deadlock Prevention and Avoidance Strategies',
-        videoId: 'V_OVxxIEbDQ',
-        thumbnail: 'https://i.ytimg.com/vi/V_OVxxIEbDQ/maxresdefault.jpg',
-        duration: '10:15',
-        views: '75K',
-        publishedAt: '1 month ago',
-      },
     ];
 
     setRelatedVideos(mockRelatedVideos);
@@ -111,6 +107,11 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
       },
     );
 
+    // Load playlist videos if we have a playlist
+    if (playlist && playlist.playlistId) {
+      loadPlaylistVideos(playlist.playlistId);
+    }
+
     return () => {
       // Clean up listeners when component unmounts
       dimensionsListener.remove();
@@ -123,15 +124,77 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
     };
   }, [isFullscreen, orientation]);
 
+  // Load playlist videos
+  const loadPlaylistVideos = async playlistId => {
+    try {
+      setPlaylistLoading(true);
+      const response = await api.youtube.getPlaylistVideos(playlistId);
+
+      if (
+        response.data &&
+        response.data.videos &&
+        Array.isArray(response.data.videos)
+      ) {
+        setPlaylistVideos(response.data.videos);
+
+        // Find the index of the current video in the playlist
+        const index = response.data.videos.findIndex(
+          v => v.id === currentVideo.id || v.videoId === currentVideo.videoId,
+        );
+        if (index !== -1) {
+          setCurrentVideoIndex(index);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading playlist videos:', error);
+    } finally {
+      setPlaylistLoading(false);
+    }
+  };
+
+  // Navigate to next video in playlist
+  const playNextVideo = () => {
+    if (
+      playlistVideos.length > 0 &&
+      currentVideoIndex < playlistVideos.length - 1
+    ) {
+      const nextVideo = playlistVideos[currentVideoIndex + 1];
+      setCurrentVideo(nextVideo);
+      setCurrentVideoIndex(currentVideoIndex + 1);
+      setPlaying(true);
+      setLoading(true);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  };
+
+  // Navigate to previous video in playlist
+  const playPreviousVideo = () => {
+    if (playlistVideos.length > 0 && currentVideoIndex > 0) {
+      const prevVideo = playlistVideos[currentVideoIndex - 1];
+      setCurrentVideo(prevVideo);
+      setCurrentVideoIndex(currentVideoIndex - 1);
+      setPlaying(true);
+      setLoading(true);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+    }
+  };
+
   // Handle YouTube player state changes
-  const onStateChange = useCallback(state => {
-    if (state === 'ended') {
-      setPlaying(false);
-    }
-    if (state === 'playing') {
-      setLoading(false);
-    }
-  }, []);
+  const onStateChange = useCallback(
+    state => {
+      if (state === 'ended') {
+        setPlaying(false);
+        // Auto-play next video when current one ends
+        if (playlist && currentVideoIndex < playlistVideos.length - 1) {
+          playNextVideo();
+        }
+      }
+      if (state === 'playing') {
+        setLoading(false);
+      }
+    },
+    [currentVideoIndex, playlistVideos.length, playlist],
+  );
 
   // Toggle fullscreen mode
   const toggleFullscreen = useCallback(() => {
@@ -150,7 +213,7 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
       setLoading(true);
       setTimeout(() => setLoading(false), 300);
     }
-  }, [isFullscreen, navigation]);
+  }, [isFullscreen]);
 
   // Calculate player dimensions based on orientation
   const getPlayerDimensions = () => {
@@ -171,6 +234,82 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
 
   const playerDimensions = getPlayerDimensions();
 
+  // Format duration for display (converts ISO duration or seconds to readable format)
+  const formatDuration = duration => {
+    if (!duration) return '';
+
+    if (typeof duration === 'string') {
+      // Handle ISO duration like "01:27:11"
+      return duration.replace(/^0+:/, '');
+    }
+
+    // Handle seconds number
+    const mins = Math.floor(duration / 60);
+    const secs = Math.floor(duration % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Render next videos in playlist
+  const renderPlaylistItem = ({ item, index }) => {
+    const isCurrentVideo = currentVideoIndex === index;
+
+    return (
+      <TouchableOpacity
+        style={[
+          styles.playlistItem,
+          {
+            backgroundColor: isCurrentVideo ? `${theme.primary}15` : theme.card,
+            borderLeftColor: isCurrentVideo ? theme.primary : 'transparent',
+            borderLeftWidth: isCurrentVideo ? 3 : 0,
+          },
+        ]}
+        onPress={() => {
+          setCurrentVideo(item);
+          setCurrentVideoIndex(index);
+          setPlaying(true);
+          setLoading(true);
+          scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+        }}
+      >
+        <View style={styles.playlistItemThumbnail}>
+          <Image
+            source={{ uri: item.thumbnailUrl }}
+            style={styles.playlistItemImage}
+          />
+          <View style={styles.playlistItemDuration}>
+            <Text style={styles.durationText}>
+              {formatDuration(item.duration)}
+            </Text>
+          </View>
+          {isCurrentVideo && (
+            <View style={styles.nowPlayingIndicator}>
+              <Icon name="play-circle" size={24} color={theme.primary} />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.playlistItemDetails}>
+          <Text
+            style={[
+              styles.playlistItemTitle,
+              { color: theme.text, fontWeight: isCurrentVideo ? '700' : '500' },
+            ]}
+            numberOfLines={2}
+          >
+            {item.title}
+          </Text>
+          <View style={styles.playlistItemMeta}>
+            <Text
+              style={[styles.playlistItemIndex, { color: theme.textSecondary }]}
+            >
+              {index + 1}/{playlistVideos.length}
+            </Text>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <>
       <SafeAreaView
@@ -178,7 +317,12 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
         edges={['top', 'left', 'right']}
       >
         {!isFullscreen && (
-          <CustomHeader title={currentVideo?.title || 'Video Player'} />
+          <CustomHeader
+            title={currentVideo?.title || 'Video Player'}
+            subtitle={playlist?.title}
+            navigation={navigation}
+            onBack={() => navigation.goBack()}
+          />
         )}
 
         <View
@@ -211,24 +355,25 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
             webViewProps={{
               androidLayerType: 'hardware',
               renderToHardwareTextureAndroid: true,
-              javaScriptEnabled: true, // Make sure JavaScript is enabled
-              domStorageEnabled: true, // Enable DOM storage
-              allowsFullscreenVideo: true, // Allow video to enter fullscreen mode
-              mediaPlaybackRequiresUserAction: false, // Allow autoplay
-              allowsInlineMediaPlayback: true, // Allow inline playback
+              javaScriptEnabled: true,
+              domStorageEnabled: true,
+              allowsFullscreenVideo: true,
+              mediaPlaybackRequiresUserAction: false,
+              allowsInlineMediaPlayback: true,
             }}
             initialPlayerParams={{
               preventFullScreen: false,
               controls: true,
               showClosedCaptions: true,
-              modestbranding: false,
+              modestbranding: true,
+              hl: 'hi',
               rel: false,
-              iv_load_policy: 1,
+              iv_load_policy: 3, // Hide annotations
               fs: 1,
               playsinline: 0,
-              autoplay: 0, // Add this to ensure controls show up initially
+              autoplay: 1,
               enablejsapi: 1,
-              origin: 'https://www.youtube.com', // Add this for better control compatibility
+              origin: 'https://www.youtube.com',
             }}
           />
 
@@ -244,14 +389,45 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
 
         {!isFullscreen && (
           <>
-            <View style={styles.videoControls}>
-              <TouchableOpacity onPress={() => setPlaying(!playing)}>
-                <Icon
-                  name={playing ? 'pause-circle' : 'play-circle'}
-                  size={40}
-                  color={theme.primary}
-                />
-              </TouchableOpacity>
+            <View
+              style={[styles.videoControls, { backgroundColor: theme.card }]}
+            >
+              <View style={styles.playbackControls}>
+                <TouchableOpacity
+                  onPress={playPreviousVideo}
+                  disabled={currentVideoIndex === 0}
+                  style={[
+                    styles.navigationButton,
+                    currentVideoIndex === 0 ? { opacity: 0.5 } : {},
+                  ]}
+                >
+                  <Icon name="skip-previous" size={28} color={theme.primary} />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.playPauseButton}
+                  onPress={() => setPlaying(!playing)}
+                >
+                  <Icon
+                    name={playing ? 'pause-circle' : 'play-circle'}
+                    size={48}
+                    color={theme.primary}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={playNextVideo}
+                  disabled={currentVideoIndex === playlistVideos.length - 1}
+                  style={[
+                    styles.navigationButton,
+                    currentVideoIndex === playlistVideos.length - 1
+                      ? { opacity: 0.5 }
+                      : {},
+                  ]}
+                >
+                  <Icon name="skip-next" size={28} color={theme.primary} />
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
                 style={styles.fullscreenTextButton}
@@ -363,7 +539,7 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
                           { color: theme.primary },
                         ]}
                       >
-                        View Playlist
+                        View All
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -375,8 +551,47 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
                 </View>
               )}
 
+              {/* New section: Next videos in playlist */}
+              {playlist && playlistVideos.length > 0 && (
+                <View style={styles.nextVideosSection}>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                    Next in Playlist ({currentVideoIndex + 1}/
+                    {playlistVideos.length})
+                  </Text>
+
+                  {playlistLoading ? (
+                    <ActivityIndicator
+                      color={theme.primary}
+                      style={styles.playlistLoader}
+                    />
+                  ) : (
+                    <FlatList
+                      data={playlistVideos}
+                      renderItem={renderPlaylistItem}
+                      keyExtractor={item => item.id}
+                      horizontal={false}
+                      scrollEnabled={false}
+                      initialNumToRender={5}
+                      maxToRenderPerBatch={10}
+                      showsVerticalScrollIndicator={false}
+                      contentContainerStyle={styles.playlistItemsContainer}
+                      ListEmptyComponent={
+                        <Text
+                          style={[
+                            styles.emptyText,
+                            { color: theme.textSecondary },
+                          ]}
+                        >
+                          No videos found in this playlist
+                        </Text>
+                      }
+                    />
+                  )}
+                </View>
+              )}
+
               <View style={styles.relatedSection}>
-                <Text style={[styles.relatedTitle, { color: theme.text }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   Related Videos
                 </Text>
 
@@ -519,24 +734,25 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
               webViewProps={{
                 androidLayerType: 'hardware',
                 renderToHardwareTextureAndroid: true,
-                javaScriptEnabled: true, // Make sure JavaScript is enabled
-                domStorageEnabled: true, // Enable DOM storage
-                allowsFullscreenVideo: true, // Allow video to enter fullscreen mode
-                mediaPlaybackRequiresUserAction: false, // Allow autoplay
-                allowsInlineMediaPlayback: true, // Allow inline playback
+                javaScriptEnabled: true,
+                domStorageEnabled: true,
+                allowsFullscreenVideo: true,
+                mediaPlaybackRequiresUserAction: false,
+                allowsInlineMediaPlayback: true,
               }}
               initialPlayerParams={{
                 preventFullScreen: false,
                 controls: true,
                 showClosedCaptions: true,
-                modestbranding: false,
+                modestbranding: true,
+                hl: 'hi',
                 rel: false,
-                iv_load_policy: 1,
+                iv_load_policy: 3,
                 fs: 1,
                 playsinline: 0,
-                autoplay: 0, // Add this to ensure controls show up initially
+                autoplay: 1,
                 enablejsapi: 1,
-                origin: 'https://www.youtube.com', // Add this for better control compatibility
+                origin: 'https://www.youtube.com',
               }}
             />
             <TouchableOpacity
@@ -546,7 +762,6 @@ const YouTubePlayerScreen = ({ navigation, route }) => {
               <Icon name="fullscreen-exit" size={28} color="#FFFFFF" />
             </TouchableOpacity>
 
-            {/* Add this overlay controls container */}
             <View style={styles.fullscreenControls}>
               <TouchableOpacity onPress={() => setPlaying(!playing)}>
                 <Icon
@@ -601,7 +816,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
+    padding: 12,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.05)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  playbackControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  navigationButton: {
+    padding: 8,
+  },
+  playPauseButton: {
+    marginHorizontal: 12,
   },
   contentScroll: {
     flex: 1,
@@ -669,14 +898,87 @@ const styles = StyleSheet.create({
   channelName: {
     fontSize: 14,
   },
-  relatedSection: {
-    padding: 16,
-    paddingTop: 0,
+  // Next Videos in Playlist section
+  nextVideosSection: {
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
-  relatedTitle: {
+  sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 16,
+  },
+  playlistLoader: {
+    marginVertical: 20,
+  },
+  playlistItemsContainer: {
+    paddingBottom: 8,
+  },
+  playlistItem: {
+    flexDirection: 'row',
+    borderRadius: 8,
+    marginBottom: 12,
+    overflow: 'hidden',
+    elevation: 1,
+  },
+  playlistItemThumbnail: {
+    position: 'relative',
+    width: 120,
+    height: 68,
+  },
+  playlistItemImage: {
+    width: 120,
+    height: 68,
+    resizeMode: 'cover',
+  },
+  playlistItemDuration: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 2,
+  },
+  durationText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '500',
+  },
+  nowPlayingIndicator: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playlistItemDetails: {
+    flex: 1,
+    padding: 10,
+    justifyContent: 'space-between',
+  },
+  playlistItemTitle: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  playlistItemMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  playlistItemIndex: {
+    fontSize: 12,
+  },
+  emptyText: {
+    textAlign: 'center',
+    padding: 20,
+  },
+  relatedSection: {
+    padding: 16,
+    paddingTop: 8,
   },
   relatedVideoItem: {
     flexDirection: 'row',
@@ -728,7 +1030,6 @@ const styles = StyleSheet.create({
   modalContent: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#FFFFFF',
     borderRadius: 12,
     padding: 16,
     elevation: 4,
@@ -772,7 +1073,6 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     elevation: 9999,
     flex: 1,
-    paddingBottom: 20, // Add padding to make room for controls
   },
   exitFullscreenButton: {
     position: 'absolute',

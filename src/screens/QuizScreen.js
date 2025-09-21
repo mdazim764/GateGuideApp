@@ -1029,6 +1029,7 @@ const QuizScreen = ({ navigation, route }) => {
               : 'Create PYQ Test'
             : quiz?.title || 'Quiz'
         }
+        navigation={navigation}
         onBack={() => {
           if (!setupMode) {
             // Replace confirm with Alert

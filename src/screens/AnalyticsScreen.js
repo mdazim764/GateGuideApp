@@ -123,6 +123,7 @@ const AnalyticsScreen = ({ navigation }) => {
     >
       <CustomHeader
         title="Analytics"
+        navigation={navigation}
         onBack={() => navigation.goBack()}
         // rightIcon="export-variant"
         // onRightPress={() => {}}

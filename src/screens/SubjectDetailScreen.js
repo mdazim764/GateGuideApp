@@ -1,239 +1,316 @@
-import React, { useContext } from 'react';
+import React, { useContext, useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   TouchableOpacity,
-  Dimensions,
+  SectionList,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeContext } from '../theme/ThemeContext';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import CustomHeader from '../components/CustomHeader'; // Adjust the import based on your file structure
+import Icon from 'react-native-vector-icons/Ionicons';
+import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
+import CustomHeader from '../components/CustomHeader';
+import api from '../services/api';
 
-const { width } = Dimensions.get('window');
-
-const SubjectDetailScreen = ({ route, navigation }) => {
+const SubjectDetailScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
-  const { subjectId, title } = route.params || {
-    id: 1,
-    title: 'Operating Systems',
+  const { subject } = route.params;
+
+  // State to track expanded topics
+  const [expandedTopics, setExpandedTopics] = useState({});
+  const [loadingSubtopics, setLoadingSubtopics] = useState({});
+
+  // State to track subtopic progress
+  const [completedSubtopics, setCompletedSubtopics] = useState(() => {
+    // Create a set of all completed subtopic IDs by scanning through the data
+    const completedSet = new Set();
+
+    // Check each unit, topic, and subtopic to find completed ones
+    if (subject && subject.units) {
+      subject.units.forEach(unit => {
+        if (unit.topics) {
+          unit.topics.forEach(topic => {
+            if (topic.subtopics) {
+              topic.subtopics.forEach(subtopic => {
+                // If the subtopic has status 'completed' or a progress of 100, add to set
+                if (
+                  subtopic.status === 'completed' ||
+                  subtopic.progress === 100
+                ) {
+                  completedSet.add(subtopic.id);
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    return completedSet;
+  });
+
+  // Toggle topic expansion
+  const toggleExpand = topicId => {
+    setExpandedTopics(prev => ({
+      ...prev,
+      [topicId]: !prev[topicId],
+    }));
   };
 
-  // Eventually you'll get subject from route.params
-  const subject = {
-    id: 1,
-    title: 'Operating Systems',
-    progress: 67,
-    description:
-      'Learn about process management, scheduling algorithms, memory management, and more.',
-    topics: [
-      { id: 1, title: 'Process Scheduling', progress: 100, completed: true },
-      { id: 2, title: 'Memory Management', progress: 75, completed: false },
-      { id: 3, title: 'File Systems', progress: 50, completed: false },
-      { id: 4, title: 'I/O Systems', progress: 30, completed: false },
-      { id: 5, title: 'Virtualization', progress: 0, completed: false },
-    ],
-    resources: [
-      { id: 1, title: 'Process Scheduling Notes', type: 'pdf' },
-      { id: 2, title: 'Memory Management Video', type: 'video' },
-      { id: 3, title: 'File Systems Practice Questions', type: 'quiz' },
-    ],
+  // Toggle subtopic completion
+  const toggleSubtopic = async subtopicId => {
+    setLoadingSubtopics(prev => ({
+      ...prev,
+      [subtopicId]: true,
+    }));
+
+    console.log('Toggling subtopic:', subtopicId);
+    console.log(
+      'Current completed status:',
+      completedSubtopics.has(subtopicId),
+    );
+
+    try {
+      // Check if the subtopic is currently completed
+      const isCurrentlyCompleted = completedSubtopics.has(subtopicId);
+
+      // Call API to update progress - specify the new status
+      await api.progress.markSubtopicCompleted(
+        subtopicId,
+        isCurrentlyCompleted ? 'not_started' : 'completed',
+      );
+
+      console.log('API call successful');
+
+      // Update local state
+      setCompletedSubtopics(prev => {
+        const newSet = new Set(prev);
+        if (isCurrentlyCompleted) {
+          newSet.delete(subtopicId);
+        } else {
+          newSet.add(subtopicId);
+        }
+        return newSet;
+      });
+    } catch (error) {
+      console.error('Error updating subtopic progress:', error);
+      Alert.alert('Error', 'Failed to update progress. Please try again.');
+    } finally {
+      setLoadingSubtopics(prev => ({
+        ...prev,
+        [subtopicId]: false,
+      }));
+    }
   };
 
-  return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
-      <CustomHeader
-        title={title || 'Subject Details'}
-        onBack={() => navigation.goBack()}
-      />
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.header}>
-          <Text style={[styles.title, { color: theme.text }]}>
-            {subject.title}
+  // Generate section data from the subject's units and topics
+  const sectionData = subject.units.map(unit => ({
+    title: unit.name,
+    id: unit.id,
+    progress: unit.progress || 0,
+    data: unit.topics || [],
+  }));
+
+  const renderSectionHeader = ({ section }) => (
+    <View style={[styles.sectionHeader, { backgroundColor: theme.background }]}>
+      <View style={[styles.unitCard, { backgroundColor: theme.card }]}>
+        <View style={styles.unitTitleContainer}>
+          <Icon name="cube-outline" size={24} color={theme.primary} />
+          <Text style={[styles.sectionTitle, { color: theme.text }]}>
+            {section.title}
           </Text>
+        </View>
+
+        <View
+          style={[styles.unitStatsContainer, { borderTopColor: theme.border }]}
+        >
           <View style={styles.progressContainer}>
-            <Text style={[styles.progressText, { color: theme.primary }]}>
-              {subject.progress}% Complete
-            </Text>
             <View
               style={[
                 styles.progressBar,
-                { backgroundColor: `${theme.primary}20` },
+                {
+                  backgroundColor: theme.primary,
+                  width: `${section.progress}%`,
+                },
               ]}
-            >
+            />
+          </View>
+
+          <View style={styles.unitStatsRow}>
+            <Text style={[styles.progressText, { color: theme.textSecondary }]}>
+              {section.progress}% Complete
+            </Text>
+
+            <Text style={[styles.topicCountText, { color: theme.primary }]}>
+              {section.data.length} Topics
+            </Text>
+          </View>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderItem = ({ item }) => {
+    const isExpanded = !!expandedTopics[item.id];
+
+    return (
+      <View style={styles.topicContainer}>
+        <TouchableOpacity
+          style={[styles.topicItem, { backgroundColor: theme.card }]}
+          activeOpacity={0.7}
+          onPress={() => toggleExpand(item.id)}
+        >
+          <View style={styles.topicContent}>
+            <Text style={[styles.topicTitle, { color: theme.text }]}>
+              {item.name}
+            </Text>
+
+            <View style={styles.progressContainer}>
               <View
                 style={[
-                  styles.progressFill,
+                  styles.progressBar,
                   {
                     backgroundColor: theme.primary,
-                    width: `${subject.progress}%`,
+                    width: `${item.progress || 0}%`,
                   },
                 ]}
               />
             </View>
-          </View>
-          <Text style={[styles.description, { color: theme.text }]}>
-            {subject.description}
-          </Text>
-        </View>
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Topics
-          </Text>
-          <View style={styles.topicsList}>
-            {subject.topics.map(topic => (
-              <TouchableOpacity
-                key={topic.id}
-                style={[styles.topicItem, { backgroundColor: theme.card }]}
-                onPress={() => {
-                  // Navigate to Tracker screen within the MoreTab
-                  navigation.navigate('SyllabusTab', {
-                    screen: 'Tracker',
-                    params: {
-                      initialTab: 'syllabus',
-                      selectedSubjectId: subject.id,
-                      selectedTopicId: topic.id,
-                    },
-                  });
-                }}
+            <View style={styles.topicDetailRow}>
+              <Text
+                style={[styles.progressText, { color: theme.textSecondary }]}
               >
-                <View style={styles.topicHeader}>
-                  <Text style={[styles.topicTitle, { color: theme.text }]}>
-                    {topic.title}
-                  </Text>
-                  {topic.completed ? (
-                    <Icon name="check-circle" size={24} color={theme.primary} />
-                  ) : (
-                    <Text
-                      style={[styles.topicProgress, { color: theme.primary }]}
-                    >
-                      {topic.progress}%
-                    </Text>
-                  )}
-                </View>
-                <View
+                {item.progress || 0}% Complete
+              </Text>
+
+              <Text style={[styles.subtopicCount, { color: theme.primary }]}>
+                {item.subtopics?.length || 0} subtopics
+              </Text>
+            </View>
+          </View>
+
+          <Icon
+            name={isExpanded ? 'chevron-down' : 'chevron-forward'}
+            size={22}
+            color={theme.primary}
+            style={styles.chevron}
+          />
+        </TouchableOpacity>
+
+        {/* Subtopics section (expanded) */}
+        {isExpanded && item.subtopics && item.subtopics.length > 0 && (
+          <View style={styles.subtopicsContainer}>
+            {item.subtopics.map(subtopic => {
+              const isCompleted = completedSubtopics.has(subtopic.id);
+              const isLoading = loadingSubtopics[subtopic.id];
+
+              return (
+                <TouchableOpacity
+                  key={subtopic.id}
                   style={[
-                    styles.topicProgressBar,
-                    { backgroundColor: `${theme.primary}20` },
+                    styles.subtopicItem,
+                    {
+                      backgroundColor: theme.background,
+                      borderLeftColor: isCompleted
+                        ? theme.primary
+                        : theme.border,
+                    },
                   ]}
+                  onPress={() => toggleSubtopic(subtopic.id)}
+                  disabled={isLoading}
                 >
-                  <View
+                  <Text
                     style={[
-                      styles.topicProgressFill,
+                      styles.subtopicText,
                       {
-                        backgroundColor: theme.primary,
-                        width: `${topic.progress}%`,
+                        color: theme.text,
+                        textDecorationLine: isCompleted
+                          ? 'line-through'
+                          : 'none',
+                        opacity: isCompleted ? 0.7 : 1,
                       },
                     ]}
-                  />
-                </View>
-              </TouchableOpacity>
-            ))}
+                  >
+                    {subtopic.name}
+                  </Text>
+
+                  {isLoading ? (
+                    <ActivityIndicator size="small" color={theme.primary} />
+                  ) : (
+                    <MaterialIcon
+                      name={
+                        isCompleted
+                          ? 'checkbox-marked-circle'
+                          : 'checkbox-blank-circle-outline'
+                      }
+                      size={22}
+                      color={isCompleted ? theme.primary : theme.textSecondary}
+                    />
+                  )}
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        </View>
+        )}
+      </View>
+    );
+  };
 
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            Study Resources
-          </Text>
-          <View style={styles.resourcesList}>
-            {subject.resources.map(resource => (
-              <TouchableOpacity
-                key={resource.id}
-                style={[styles.resourceItem, { backgroundColor: theme.card }]}
-                onPress={() => {
-                  // Navigate to Resources screen with filters
-                  navigation.navigate('ResourcesTab', {
-                    screen: 'Resources',
-                    params: {
-                      initialSubject: subject.title,
-                      initialType: resource.type,
-                      searchQuery: resource.title, // Optional: to directly find this resource
-                    },
-                  });
-                }}
-              >
-                <Icon
-                  name={
-                    resource.type === 'pdf'
-                      ? 'file-pdf-box'
-                      : resource.type === 'video'
-                      ? 'video'
-                      : 'help-box'
-                  }
-                  size={24}
-                  color={theme.primary}
-                />
-                <Text style={[styles.resourceTitle, { color: theme.text }]}>
-                  {resource.title}
-                </Text>
-                <Icon name="chevron-right" size={20} color={theme.text} />
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+  // Generate an overall progress summary for the subject
+  const topicCount = sectionData.reduce(
+    (count, unit) => count + unit.data.length,
+    0,
+  );
+  const averageProgress =
+    sectionData.reduce((sum, unit) => sum + unit.progress, 0) /
+    (sectionData.length || 1);
 
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.startButton, { backgroundColor: theme.primary }]}
-            onPress={() => {
-              // Navigate to Resources tab with subject filter
-              navigation.navigate('ResourcesTab', {
-                screen: 'Resources',
-                params: {
-                  initialSubject: subject.title,
-                  initialType: 'All',
-                },
-              });
-            }}
-          >
-            <Icon name="play" size={20} color="#FFFFFF" />
-            <Text style={styles.startButtonText}>Continue Learning</Text>
-          </TouchableOpacity>
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <CustomHeader
+        title={subject.name}
+        navigation={navigation}
+        route={route}
+      />
 
-          <TouchableOpacity
+      {/* Overall progress card */}
+      <View style={[styles.overallCard, { backgroundColor: theme.card }]}>
+        <Text style={[styles.overallTitle, { color: theme.text }]}>
+          Overall Progress
+        </Text>
+        <View style={styles.progressContainer}>
+          <View
             style={[
-              styles.quizButton,
-              { backgroundColor: `${theme.primary}20` },
+              styles.progressBar,
+              {
+                backgroundColor: theme.primary,
+                width: `${Math.round(averageProgress)}%`,
+              },
             ]}
-            onPress={() => {
-              // This navigates to the Quiz screen in the current stack
-              // If Quiz is in a different stack, use the path below instead
-              navigation.navigate('Quiz', {
-                subjectId: subject.id,
-                title: subject.title,
-              });
-
-              // Alternative for nested navigation:
-              // navigation.navigate('MoreTab', {
-              //   screen: 'Quiz',
-              //   params: {
-              //     subjectId: subject.id,
-              //     title: subject.title
-              //   }
-              // });
-            }}
-          >
-            <Icon
-              name="file-document-outline"
-              size={20}
-              color={theme.primary}
-            />
-            <Text style={[styles.quizButtonText, { color: theme.primary }]}>
-              Take Practice Quiz
-            </Text>
-          </TouchableOpacity>
+          />
         </View>
-      </ScrollView>
-    </SafeAreaView>
+        <View style={styles.overallStats}>
+          <Text style={[styles.overallText, { color: theme.textSecondary }]}>
+            {Math.round(averageProgress)}% Complete
+          </Text>
+          <Text style={[styles.overallText, { color: theme.textSecondary }]}>
+            {sectionData.length} Units • {topicCount} Topics
+          </Text>
+        </View>
+      </View>
+
+      <SectionList
+        sections={sectionData}
+        keyExtractor={(item, index) => item.id || index.toString()}
+        renderSectionHeader={renderSectionHeader}
+        renderItem={renderItem}
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={styles.listContent}
+      />
+    </View>
   );
 };
 
@@ -241,133 +318,137 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
-  },
-  header: {
-    padding: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  progressContainer: {
-    marginBottom: 16,
-  },
-  progressText: {
-    fontSize: 18,
-    fontWeight: 'bold',
+  overallCard: {
+    margin: 16,
     marginBottom: 8,
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  description: {
-    fontSize: 16,
-    lineHeight: 24,
-  },
-  section: {
-    marginTop: 24,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  topicsList: {
-    marginBottom: 8,
-  },
-  topicItem: {
     padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
+    borderRadius: 12,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
-  topicHeader: {
+  overallTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  overallStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  overallText: {
+    fontSize: 13,
+  },
+  sectionHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  unitCard: {
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  unitTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 10,
+  },
+  unitStatsContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+  },
+  unitStatsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginTop: 4,
+  },
+  topicCountText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  topicContainer: {
     marginBottom: 8,
+  },
+  topicItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginVertical: 6,
+    borderRadius: 10,
+    elevation: 1,
+  },
+  topicContent: {
+    flex: 1,
   },
   topicTitle: {
     fontSize: 16,
     fontWeight: '500',
+    marginBottom: 8,
   },
-  topicProgress: {
-    fontSize: 16,
-    fontWeight: 'bold',
+  topicDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
-  topicProgressBar: {
+  subtopicCount: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  progressContainer: {
     height: 6,
+    backgroundColor: '#E0E0E0',
     borderRadius: 3,
     overflow: 'hidden',
+    marginBottom: 4,
   },
-  topicProgressFill: {
+  progressBar: {
     height: '100%',
-    borderRadius: 3,
   },
-  resourcesList: {
-    marginBottom: 16,
+  progressText: {
+    fontSize: 12,
   },
-  resourceItem: {
+  chevron: {
+    marginLeft: 8,
+  },
+  listContent: {
+    paddingBottom: 24,
+  },
+  subtopicsContainer: {
+    marginHorizontal: 16,
+    marginBottom: 8,
+    marginTop: -4,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  subtopicItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 1,
+    borderLeftWidth: 3,
   },
-  resourceTitle: {
-    fontSize: 16,
+  subtopicText: {
+    fontSize: 14,
     flex: 1,
-    marginLeft: 12,
-  },
-  actionButtons: {
-    padding: 16,
-    marginTop: 8,
-    marginBottom: 24,
-  },
-  startButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  startButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
-  },
-  quizButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 8,
-  },
-  quizButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    marginRight: 8,
   },
 });
 

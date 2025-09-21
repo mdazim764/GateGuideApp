@@ -1,7 +1,10 @@
 import React, { useContext } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
-import Icon from 'react-native-vector-icons/Ionicons';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+
+import { useAuth } from '../context/AuthContext';
 import { ThemeContext } from '../theme/ThemeContext';
 
 // Import screens
@@ -35,24 +38,27 @@ const MainTabNavigator = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        headerShown: false,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-          if (route.name === 'HomeTab')
+
+          if (route.name === 'HomeTab') {
             iconName = focused ? 'home' : 'home-outline';
-          else if (route.name === 'SyllabusTab')
-            iconName = focused ? 'list' : 'list-outline';
-          else if (route.name === 'ResourcesTab')
-            iconName = focused ? 'play-circle' : 'play-circle-outline';
-          else if (route.name === 'TimerTab')
-            iconName = focused ? 'time' : 'time-outline';
-          else if (route.name === 'MoreTab')
-            iconName = focused ? 'menu' : 'menu-outline';
+          } else if (route.name === 'SyllabusTab') {
+            iconName = focused ? 'book-open-variant' : 'book-outline';
+          } else if (route.name === 'ResourcesTab') {
+            iconName = focused ? 'folder' : 'folder-outline';
+          } else if (route.name === 'TrackerTab') {
+            iconName = focused ? 'chart-line' : 'chart-line-variant';
+          } else if (route.name === 'MoreTab') {
+            iconName = focused ? 'dots-horizontal' : 'dots-horizontal';
+          }
+
           return <Icon name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: theme.tabIconFocused,
-        tabBarInactiveTintColor: theme.tabIcon,
-        tabBarStyle: { backgroundColor: theme.tabBar },
+        tabBarActiveTintColor: theme.primary,
+        tabBarInactiveTintColor: `${theme.text}70`,
+        tabBarStyle: { backgroundColor: theme.card },
+        headerShown: false,
       })}
     >
       <Tab.Screen
@@ -71,9 +77,9 @@ const MainTabNavigator = () => {
         options={{ tabBarLabel: 'Resources' }}
       />
       <Tab.Screen
-        name="TimerTab"
-        component={TimerStackScreen}
-        options={{ tabBarLabel: 'Timer' }}
+        name="TrackerTab"
+        component={TrackerStackScreen}
+        options={{ tabBarLabel: 'Tracker' }}
       />
       <Tab.Screen
         name="MoreTab"
@@ -99,6 +105,9 @@ const HomeStackScreen = () => (
     <HomeStack.Screen name="Quotes" component={QuotesScreen} />
     <HomeStack.Screen name="Tracker" component={TrackerScreen} />
     <HomeStack.Screen name="Syllabus" component={SyllabusScreen} />
+    <HomeStack.Screen name="Timer" component={TimerScreen} />
+    <HomeStack.Screen name="AiGuide" component={AiGuideScreen} />
+    <HomeStack.Screen name="AddResource" component={AddResourceScreen} />
   </HomeStack.Navigator>
 );
 
@@ -134,18 +143,16 @@ const ResourcesStackScreen = () => (
     <ResourcesStack.Screen
       name="YouTubePlayer"
       component={YouTubePlayerScreen}
-      options={({ route }) => ({
-        tabBarVisible: route.params?.hideTabBar === true ? false : true,
-      })}
     />
   </ResourcesStack.Navigator>
 );
 
-const TimerStack = createStackNavigator();
-const TimerStackScreen = () => (
-  <TimerStack.Navigator screenOptions={{ headerShown: false }}>
-    <TimerStack.Screen name="Timer" component={TimerScreen} />
-  </TimerStack.Navigator>
+const TrackerStack = createStackNavigator();
+const TrackerStackScreen = () => (
+  <TrackerStack.Navigator screenOptions={{ headerShown: false }}>
+    <TrackerStack.Screen name="Tracker" component={TrackerScreen} />
+    <TrackerStack.Screen name="QuizResult" component={QuizResultScreen} />
+  </TrackerStack.Navigator>
 );
 
 const MoreStack = createStackNavigator();
@@ -178,27 +185,41 @@ const MoreStackScreen = () => (
 );
 
 // Authentication navigator
-const AuthStack = createStackNavigator();
-const AuthStackScreen = () => (
-  <AuthStack.Navigator screenOptions={{ headerShown: false }}>
-    <AuthStack.Screen name="Login" component={LoginScreen} />
-    <AuthStack.Screen name="Register" component={RegisterScreen} />
-  </AuthStack.Navigator>
+const AuthStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Login" component={LoginScreen} />
+    <Stack.Screen name="Register" component={RegisterScreen} />
+  </Stack.Navigator>
 );
 
 // Root navigator for handling auth flow
-const RootStack = createStackNavigator();
 const AppNavigator = () => {
+  const { isLoggedIn, loading } = useAuth();
+  const { theme } = useContext(ThemeContext);
+
+  if (loading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: 'center',
+          alignItems: 'center',
+          backgroundColor: theme.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={theme.primary} />
+      </View>
+    );
+  }
+
   return (
-    <RootStack.Navigator screenOptions={{ headerShown: false }}>
-      {/* For now, just show the main app. Later you can add auth logic:
-      {isSignedIn ? (
-        <RootStack.Screen name="Main" component={MainTabNavigator} />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {isLoggedIn ? (
+        <Stack.Screen name="Main" component={MainTabNavigator} />
       ) : (
-        <RootStack.Screen name="Auth" component={AuthStackScreen} />
-      )} */}
-      <RootStack.Screen name="Main" component={MainTabNavigator} />
-    </RootStack.Navigator>
+        <Stack.Screen name="Auth" component={AuthStack} />
+      )}
+    </Stack.Navigator>
   );
 };
 

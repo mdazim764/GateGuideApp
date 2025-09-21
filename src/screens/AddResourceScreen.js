@@ -239,7 +239,11 @@ const AddResourceScreen = ({ navigation }) => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
-      <CustomHeader title="Add Resource" onBack={() => navigation.goBack()} />
+      <CustomHeader
+        title="Add Resource"
+        navigation={navigation}
+        onBack={() => navigation.goBack()}
+      />
 
       <ScrollView
         contentContainerStyle={styles.scrollContent}

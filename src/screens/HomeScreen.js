@@ -18,6 +18,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useApp } from '../context/AppContext';
 import { ThemeContext } from '../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../context/AuthContext';
+import api from '../services/api';
+
+// Import your components
+import QuoteCard from '../components/quotes/QuoteCard';
 
 const { width } = Dimensions.get('window');
 
@@ -30,70 +35,42 @@ const defaultTheme = {
 };
 
 const HomeScreen = ({ navigation }) => {
-  // Use try/catch to handle any context errors
-  let appContextValues = { isLoading: true };
-  let themeContextValues = { theme: defaultTheme };
+  const { theme } = useContext(ThemeContext);
+  const { user } = useAuth();
 
-  try {
-    appContextValues = useApp() || { isLoading: true };
-  } catch (error) {
-    console.error('Error loading AppContext:', error);
-  }
+  // States for data
+  const [dashboardData, setDashboardData] = useState(null);
+  const [recentQuizzes, setRecentQuizzes] = useState([]);
+  const [studyStreak, setStudyStreak] = useState(null);
 
-  try {
-    themeContextValues = useContext(ThemeContext) || { theme: defaultTheme };
-  } catch (error) {
-    console.error('Error loading ThemeContext:', error);
-  }
-
-  const { currentQuote, progress, isLoading = true } = appContextValues;
-  const { theme = defaultTheme } = themeContextValues;
-
-  console.log('Theme loaded:', theme); // Debug logging
-  console.log('App Context:', appContextValues); // Debug logging
-
-  const [daysRemaining, setDaysRemaining] = useState(0);
-  const [overallProgress, setOverallProgress] = useState(0);
+  // Loading and error states
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [studyStreak, setStudyStreak] = useState(7); // Mock data
-  const [localTasks, setLocalTasks] = useState([]);
-  const [isComponentMounted, setIsComponentMounted] = useState(false);
-  const [hasError, setHasError] = useState(false);
-  const [recentlyViewedItems, setRecentlyViewedItems] = useState([
-    {
-      id: 1,
-      title: 'Operating Systems',
-      subtitle: 'Process Scheduling & Memory Management',
-      progress: 67,
-      duration: '45 min',
-    },
-    {
-      id: 2,
-      title: 'Data Structures',
-      subtitle: 'Graph Algorithms & Applications',
-      progress: 38,
-      duration: '60 min',
-    },
-    {
-      id: 3,
-      title: 'Computer Networks',
-      subtitle: 'Network Layer & Routing Protocols',
-      progress: 22,
-      duration: '30 min',
-    },
-  ]);
+  const [error, setError] = useState(null);
 
-  // Animations - with error handling
-  const progressAnim = useRef(new Animated.Value(0)).current;
+  // Animation refs
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.95)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+  const [isMounted, setIsMounted] = useState(false);
 
+  // Add loading state for quotes
+  const [quoteLoading, setQuoteLoading] = useState(false);
+
+  // Calculate remaining days until deadline (Feb 1, 2026)
+  const calculateRemainingDays = () => {
+    const today = new Date();
+    const deadline = new Date('2026-02-01');
+    const timeDiff = deadline.getTime() - today.getTime();
+    const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+    return Math.max(0, daysDiff);
+  };
+
+  const [remainingDays, setRemainingDays] = useState(calculateRemainingDays());
+
+  // Animation for entrance
   useEffect(() => {
     console.log('Running entrance animations');
-
-    // Simple animation with fewer dependencies
-    fadeAnim.setValue(0);
-    scaleAnim.setValue(0.95);
+    setIsMounted(true);
 
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -101,828 +78,751 @@ const HomeScreen = ({ navigation }) => {
         duration: 800,
         useNativeDriver: true,
       }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
+      Animated.timing(slideAnim, {
+        toValue: 0,
         duration: 800,
         useNativeDriver: true,
       }),
-    ]).start(() => console.log('Animation complete'));
-
-    // Set up other data
-    setDaysRemaining(586); // Hard-coded value for testing
-    setOverallProgress(25);
+    ]).start(() => {
+      console.log('Animation complete');
+    });
   }, []);
 
-  useEffect(() => {
-    // Update progress animation when progress changes
-    if (!hasError && isComponentMounted) {
-      try {
-        Animated.timing(progressAnim, {
-          toValue: overallProgress,
-          duration: 1000,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: false,
-        }).start();
-      } catch (error) {
-        console.error('Error animating progress:', error);
+  // Add a state for the current quote
+  const [currentQuote, setCurrentQuote] = useState({
+    text: 'Learning is not attained by chance, it must be sought for with ardor and diligence.',
+    author: 'Abigail Adams',
+  });
+
+  // Replace setRandomQuote function with this one that fetches from API
+  const fetchRandomQuote = async () => {
+    try {
+      setQuoteLoading(true);
+      const response = await api.quotes.getRandomQuote();
+
+      // Check the response structure and format accordingly
+      if (response.data && response.data.quote) {
+        // If the API returns { quote: "...", author: "..." }
+        setCurrentQuote(response.data);
+      } else if (response.data && response.data.text) {
+        // If the API returns { text: "...", author: "..." }
+        setCurrentQuote(response.data);
+      } else {
+        // Fallback to a default quote if the structure is unexpected
+        setCurrentQuote({
+          text: 'Education is the passport to the future, for tomorrow belongs to those who prepare for it today.',
+          author: 'Malcolm X',
+        });
       }
+    } catch (error) {
+      console.log('Error fetching quote:', error);
+      // Fallback to static quotes on error
+      const staticQuotes = [
+        {
+          text: 'The expert in anything was once a beginner.',
+          author: 'Helen Hayes',
+        },
+        {
+          text: 'The beautiful thing about learning is that no one can take it away from you.',
+          author: 'B.B. King',
+        },
+        {
+          text: 'Education is the passport to the future.',
+          author: 'Malcolm X',
+        },
+        {
+          text: 'The more that you read, the more things you will know.',
+          author: 'Dr. Seuss',
+        },
+        {
+          text: 'The only way to do great work is to love what you do.',
+          author: 'Steve Jobs',
+        },
+      ];
+      const randomIndex = Math.floor(Math.random() * staticQuotes.length);
+      setCurrentQuote(staticQuotes[randomIndex]);
+    } finally {
+      setQuoteLoading(false);
     }
-  }, [overallProgress, isComponentMounted]);
+  };
 
-  const onRefresh = React.useCallback(() => {
-    setRefreshing(true);
-    setTimeout(() => {
-      // Mock refreshing data
+  // Function to load data from API
+  const loadDashboardData = async (showRefresh = false) => {
+    try {
+      if (showRefresh) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
+      }
+
+      setError(null);
+
+      // Implement separate try/catch blocks for each API call
+      // so one failure doesn't prevent others from loading
+
+      // 1. Load summary data
+      try {
+        const summaryResponse = await api.dashboard.getSummary();
+        setDashboardData(summaryResponse.data);
+      } catch (summaryError) {
+        console.log('Error loading summary:', summaryError);
+        // Set default empty data
+        setDashboardData({
+          overallProgress: 0,
+          completedSubtopics: 0,
+          totalSubtopics: 0,
+          quizzesTaken: 0,
+          averageScore: 0,
+          totalHoursStudied: 0,
+        });
+      }
+
+      // 2. Load recent quizzes
+      try {
+        const quizzesResponse = await api.dashboard.getRecentQuizzes();
+        setRecentQuizzes(quizzesResponse.data);
+      } catch (quizzesError) {
+        console.log('Error loading quizzes:', quizzesError);
+        setRecentQuizzes([]);
+      }
+
+      // 3. Load study streak
+      try {
+        const streakResponse = await api.dashboard.getStudyStreak();
+        setStudyStreak(streakResponse.data);
+      } catch (streakError) {
+        console.log('Error loading streak:', streakError);
+        setStudyStreak({
+          currentStreak: 0,
+          longestStreak: 0,
+        });
+      }
+
+      // Update remaining days calculation
+      setRemainingDays(calculateRemainingDays());
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+      setError('Could not load dashboard data. Please check your connection.');
+    } finally {
+      setLoading(false);
       setRefreshing(false);
-    }, 1500);
-  }, []);
-
-  const toggleTaskCompletion = id => {
-    setLocalTasks(
-      localTasks.map(task =>
-        task.id === id ? { ...task, completed: !task.completed } : task,
-      ),
-    );
-  };
-
-  const getPriorityColor = priority => {
-    switch (priority) {
-      case 'high':
-        return '#E74C3C';
-      case 'medium':
-        return '#F39C12';
-      case 'low':
-        return '#2ECC71';
-      default:
-        return theme.text || '#000000';
     }
   };
 
-  const calculateTimeLeft = () => {
-    // Calculate hours, minutes left for today's study
-    const now = new Date();
-    const hours = 22 - now.getHours();
-    const minutes = 60 - now.getMinutes();
-
-    return hours > 0
-      ? `${hours} hr ${minutes} min left today`
-      : 'Last hour for today!';
-  };
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
-    return 'Good evening';
-  };
-
-  // Simple styles for error state
-  const errorStyles = StyleSheet.create({
-    container: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-      backgroundColor: '#FFF',
-    },
-    text: {
-      fontSize: 16,
-      marginBottom: 20,
-      textAlign: 'center',
-    },
-    button: {
-      backgroundColor: '#007AFF',
-      padding: 12,
-      borderRadius: 8,
-    },
-    buttonText: {
-      color: '#FFF',
-      fontWeight: 'bold',
-    },
-  });
-
-  // Handle error state with simple UI
-  if (hasError) {
-    return (
-      <View style={errorStyles.container}>
-        <Text style={errorStyles.text}>
-          Something went wrong loading the dashboard. Please try again.
-        </Text>
-        <TouchableOpacity
-          style={errorStyles.button}
-          onPress={() => {
-            setHasError(false);
-            setIsComponentMounted(false);
-            // Force remount component logic
-            setTimeout(() => setIsComponentMounted(true), 100);
-          }}
-        >
-          <Text style={errorStyles.buttonText}>Retry</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
-  // Force component to mount properly
-  const [isMounted, setIsMounted] = useState(false);
-
+  // Load data on component mount
   useEffect(() => {
-    // Set component as mounted after a short delay
-    const timer = setTimeout(() => {
-      setIsMounted(true);
-      setIsComponentMounted(true);
-    }, 100);
-
-    return () => clearTimeout(timer);
+    fetchRandomQuote();
+    loadDashboardData();
   }, []);
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: theme.background || '#FFFFFF',
-    },
-    loadingContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    loadingText: {
-      fontSize: 16,
-      marginTop: 16,
-    },
-    scrollView: {
-      flex: 1,
-    },
-    header: {
-      padding: 16,
-      paddingBottom: 0,
-    },
-    title: {
-      color: theme.text,
-      fontSize: 28,
-      fontWeight: 'bold',
-      marginBottom: 4,
-      textAlign: 'center',
-    },
-    subtitle: {
-      color: theme.text,
-      fontSize: 16,
-      opacity: 0.8,
-      textAlign: 'center',
-      marginBottom: 16,
-    },
-    greeting: {
-      color: theme.text,
-      fontSize: 20,
-      fontWeight: 'bold',
-      marginHorizontal: 16,
-      marginTop: 8,
-    },
-    streakContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginHorizontal: 16,
-      marginTop: 4,
-      marginBottom: 12,
-    },
-    streakText: {
-      color: theme.text,
-      opacity: 0.8,
-      fontSize: 14,
-      marginLeft: 6,
-    },
-    countdownContainer: {
-      backgroundColor: theme.card,
-      borderRadius: 12,
-      padding: 16,
-      marginHorizontal: 16,
-      marginBottom: 16,
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    },
-    countdownContent: {
-      flex: 1,
-    },
-    countdownText: {
-      color: theme.text,
-      fontSize: 16,
-    },
-    daysNumber: {
-      color: theme.primary,
-      fontSize: 24,
-      fontWeight: 'bold',
-    },
-    timeLeftText: {
-      color: theme.text,
-      fontSize: 12,
-      opacity: 0.7,
-      marginTop: 6,
-    },
-    countdownIcon: {
-      backgroundColor: `${theme.primary}20`,
-      width: 56,
-      height: 56,
-      borderRadius: 28,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginLeft: 16,
-    },
-    progressContainer: {
-      backgroundColor: theme.card,
-      borderRadius: 12,
-      padding: 16,
-      marginHorizontal: 16,
-      marginBottom: 16,
-      alignItems: 'center',
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    },
-    progressHeader: {
-      flexDirection: 'row',
-      width: '100%',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    progressTitle: {
-      color: theme.text,
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    progressPercent: {
-      color: theme.primary,
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    progressBar: {
-      height: 10,
-      width: '100%',
-      backgroundColor: `${theme.primary}20`,
-      borderRadius: 10,
-      marginVertical: 10,
-      overflow: 'hidden',
-    },
-    progressFill: {
-      height: '100%',
-      backgroundColor: theme.primary,
-      borderRadius: 10,
-    },
-    progressStats: {
-      flexDirection: 'row',
-      width: '100%',
-      justifyContent: 'space-around',
-      marginTop: 16,
-    },
-    statItem: {
-      alignItems: 'center',
-    },
-    statNumber: {
-      color: theme.primary,
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    statLabel: {
-      color: theme.text,
-      fontSize: 12,
-      opacity: 0.7,
-    },
-    quoteCard: {
-      padding: 20,
-      borderRadius: 12,
-      marginHorizontal: 16,
-      marginBottom: 16,
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      borderLeftWidth: 4,
-      borderLeftColor: theme.primary,
-    },
-    quoteText: {
-      fontSize: 16,
-      fontStyle: 'italic',
-      marginBottom: 8,
-      lineHeight: 22,
-    },
-    quoteAuthor: {
-      fontSize: 14,
-      textAlign: 'right',
-      fontWeight: 'bold',
-    },
-    sectionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginHorizontal: 16,
-      marginTop: 24,
-      marginBottom: 8,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: 'bold',
-    },
-    viewAllText: {
-      color: theme.primary,
-      fontSize: 14,
-    },
-    todayTasksCard: {
-      backgroundColor: theme.card,
-      borderRadius: 12,
-      padding: 16,
-      marginHorizontal: 16,
-      marginBottom: 16,
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    },
-    taskItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingVertical: 12,
-      borderBottomWidth: 1,
-      borderBottomColor: `${theme.text}10`,
-    },
-    taskLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-    },
-    priorityIndicator: {
-      width: 4,
-      height: 36,
-      borderRadius: 2,
-      marginRight: 12,
-    },
-    taskCheckbox: {
-      marginRight: 12,
-    },
-    taskTextContainer: {
-      flex: 1,
-    },
-    taskText: {
-      color: theme.text,
-      fontSize: 16,
-      flex: 1,
-    },
-    taskSubject: {
-      fontSize: 12,
-      opacity: 0.6,
-      marginTop: 2,
-    },
-    emptyTaskText: {
-      color: theme.text,
-      fontSize: 16,
-      textAlign: 'center',
-      fontStyle: 'italic',
-      padding: 8,
-    },
-    actionButton: {
-      backgroundColor: theme.primary,
-      borderRadius: 8,
-      padding: 14,
-      alignItems: 'center',
-      marginTop: 12,
-      flexDirection: 'row',
-      justifyContent: 'center',
-    },
-    actionButtonText: {
-      color: '#FFFFFF',
-      fontWeight: 'bold',
-      fontSize: 16,
-      marginLeft: 8,
-    },
-    quickActionsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      marginHorizontal: 16,
-      marginBottom: 24,
-    },
-    quickActionItem: {
-      backgroundColor: theme.card,
-      width: (width - 48) / 2,
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 16,
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      alignItems: 'center',
-    },
-    quickActionIcon: {
-      backgroundColor: `${theme.primary}20`,
-      width: 50,
-      height: 50,
-      borderRadius: 25,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 12,
-    },
-    quickActionText: {
-      color: theme.text,
-      fontSize: 14,
-      textAlign: 'center',
-    },
-    recentlyViewedSection: {
-      marginBottom: 24,
-    },
-    recentItem: {
-      backgroundColor: theme.card,
-      borderRadius: 12,
-      padding: 16,
-      width: width * 0.75,
-      marginRight: 12,
-      elevation: 3,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-    },
-    recentItemTitle: {
-      color: theme.text,
-      fontSize: 16,
-      fontWeight: 'bold',
-      marginBottom: 8,
-    },
-    recentItemSubtitle: {
-      color: theme.text,
-      opacity: 0.7,
-      fontSize: 14,
-      marginBottom: 12,
-    },
-    recentItemFooter: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    recentItemProgress: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    recentItemProgressText: {
-      color: theme.primary,
-      fontSize: 14,
-      fontWeight: 'bold',
-      marginLeft: 8,
-    },
-  });
+  // Pull-to-refresh handler
+  const handleRefresh = () => {
+    loadDashboardData(true);
+  };
 
-  // Use a basic debugging screen to help diagnose
-  if (!isComponentMounted) {
+  if (loading && !refreshing) {
     return (
       <View
-        style={[
-          styles.loadingContainer,
-          { backgroundColor: theme.background || '#FFFFFF' },
-        ]}
+        style={[styles.loadingContainer, { backgroundColor: theme.background }]}
       >
-        <ActivityIndicator size="large" color={theme.primary || '#007AFF'} />
-        <Text style={{ marginTop: 20, color: theme.text || '#000000' }}>
-          Initializing Dashboard...
-        </Text>
+        <ActivityIndicator size="large" color={theme.primary} />
       </View>
     );
   }
-
-  // Show loading screen with more info
-  if (!isMounted || (isLoading && !hasError)) {
-    return (
-      <View
-        style={[
-          styles.loadingContainer,
-          { backgroundColor: theme.background || '#FFFFFF' },
-        ]}
-      >
-        <ActivityIndicator size="large" color={theme.primary || '#007AFF'} />
-        <Text style={{ marginTop: 20, color: theme.text || '#000000' }}>
-          Loading your study dashboard...
-        </Text>
-      </View>
-    );
-  }
-
-  console.log(
-    'Rendering with theme:',
-    theme.background,
-    theme.text,
-    'isLoading:',
-    isLoading,
-    'isMounted:',
-    isComponentMounted,
-  );
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
-      edges={['top', 'right', 'left']}
     >
-      <Animated.ScrollView
-        style={styles.scrollView}
+      <Animated.View
+        style={[
+          styles.header,
+          {
+            backgroundColor: theme.card,
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          },
+        ]}
+      >
+        <View>
+          <Text style={[styles.greeting, { color: theme.text }]}>
+            Hello, {user?.name || 'Student'}
+          </Text>
+          <Text style={[styles.subtitle, { color: theme.textSecondary }]}>
+            {new Date().toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+            })}
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.settingsButton}
+          onPress={() => navigation.navigate('MoreTab', { screen: 'Settings' })}
+        >
+          <Icon name="cog" size={24} color={theme.text} />
+        </TouchableOpacity>
+      </Animated.View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 24, paddingTop: 8 }}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
+            onRefresh={handleRefresh}
             colors={[theme.primary]}
             tintColor={theme.primary}
-            progressBackgroundColor={theme.card}
           />
         }
       >
-        {/* <View
-          style={{
-            position: 'absolute',
-            top: 10,
-            right: 10,
-            backgroundColor: 'red',
-            padding: 5,
-            zIndex: 9999,
-            borderRadius: 5,
-          }}
-        >
-          <Text style={{ color: 'white' }}>DEBUG</Text>
-        </View> */}
-        <Animated.View
-          style={{ opacity: fadeAnim, transform: [{ scale: scaleAnim }] }}
-        >
-          <Text style={[styles.greeting, { color: theme.text }]}>
-            {getGreeting()}, Azim
-          </Text>
-
-          <View style={styles.streakContainer}>
-            <Icon name="fire" size={18} color={theme.primary} />
-            <Text style={styles.streakText}>
-              {studyStreak} day study streak! Keep it up!
+        {error ? (
+          <View style={styles.errorContainer}>
+            <Icon name="alert-circle-outline" size={48} color="#E53935" />
+            <Text style={[styles.errorText, { color: theme.text }]}>
+              {error}
             </Text>
-          </View>
-
-          {/* Exam Countdown */}
-          <View style={styles.countdownContainer}>
-            <View style={styles.countdownContent}>
-              <Text style={[styles.countdownText, { color: theme.text }]}>
-                GATE Exam Countdown
-              </Text>
-              <Text style={styles.daysNumber}>{daysRemaining} days left</Text>
-              <Text style={styles.timeLeftText}>{calculateTimeLeft()}</Text>
-            </View>
-            <View style={styles.countdownIcon}>
-              <Icon name="calendar-clock" size={28} color={theme.primary} />
-            </View>
-          </View>
-
-          {/* Overall Progress */}
-          <View style={styles.progressContainer}>
-            <View style={styles.progressHeader}>
-              <Text style={styles.progressTitle}>Your Progress</Text>
-              <Text style={styles.progressPercent}>{overallProgress}%</Text>
-            </View>
-
-            <View style={styles.progressBar}>
-              <Animated.View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: progressAnim.interpolate({
-                      inputRange: [0, 100],
-                      outputRange: ['0%', '100%'],
-                    }),
-                  },
-                ]}
-              />
-            </View>
-
-            <View style={styles.progressStats}>
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>38</Text>
-                <Text style={styles.statLabel}>Topics Covered</Text>
-              </View>
-
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>72</Text>
-                <Text style={styles.statLabel}>Hours Studied</Text>
-              </View>
-
-              <View style={styles.statItem}>
-                <Text style={styles.statNumber}>426</Text>
-                <Text style={styles.statLabel}>Questions Solved</Text>
-              </View>
-            </View>
-          </View>
-
-          {/* Recently Viewed */}
-          <View style={styles.recentlyViewedSection}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                Continue Learning
-              </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Syllabus')}>
-                <Text style={styles.viewAllText}>View All</Text>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingLeft: 16,
-                paddingRight: 4,
-                paddingVertical: 8,
-              }}
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: theme.primary }]}
+              onPress={() => loadDashboardData()}
             >
-              {recentlyViewedItems.map(item => (
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            {/* Progress Overview */}
+            <Animated.View
+              style={[
+                styles.section,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Your Progress
+              </Text>
+              <View style={styles.progressCards}>
+                <View
+                  style={[styles.progressCard, { backgroundColor: theme.card }]}
+                >
+                  <Icon
+                    name="book-open-variant"
+                    size={24}
+                    color={theme.primary}
+                  />
+                  <Text style={[styles.progressValue, { color: theme.text }]}>
+                    {dashboardData?.overallProgress || 0}%
+                  </Text>
+                  <Text
+                    style={[
+                      styles.progressLabel,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Overall Syllabus
+                  </Text>
+                </View>
+
+                <View
+                  style={[styles.progressCard, { backgroundColor: theme.card }]}
+                >
+                  <Icon name="fire" size={24} color="#FF9800" />
+                  <Text style={[styles.progressValue, { color: theme.text }]}>
+                    {studyStreak?.currentStreak || 0}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.progressLabel,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Day Streak
+                  </Text>
+                </View>
+
+                <View
+                  style={[styles.progressCard, { backgroundColor: theme.card }]}
+                >
+                  <Icon name="check-circle" size={24} color="#4CAF50" />
+                  <Text style={[styles.progressValue, { color: theme.text }]}>
+                    {dashboardData?.completedSubtopics || 0}/
+                    {dashboardData?.totalSubtopics || 0}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.progressLabel,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    Topics Done
+                  </Text>
+                </View>
+              </View>
+            </Animated.View>
+
+            {/* GATE Countdown */}
+            <Animated.View
+              style={[
+                styles.section,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                GATE Countdown
+              </Text>
+              <View
+                style={[styles.countdownCard, { backgroundColor: theme.card }]}
+              >
+                <Icon name="calendar-clock" size={32} color={theme.primary} />
+                <View style={styles.countdownDetails}>
+                  <Text style={[styles.daysCount, { color: theme.text }]}>
+                    {remainingDays}
+                  </Text>
+                  <Text
+                    style={[styles.daysLabel, { color: theme.textSecondary }]}
+                  >
+                    days remaining
+                  </Text>
+                </View>
                 <TouchableOpacity
-                  key={item.id}
-                  style={styles.recentItem}
+                  style={[
+                    styles.planButton,
+                    { backgroundColor: theme.primary },
+                  ]}
                   onPress={() =>
-                    navigation.navigate('SubjectDetail', {
-                      subjectId: item.id,
-                      title: item.title,
-                    })
+                    navigation.navigate('MoreTab', { screen: 'Planner' })
                   }
                 >
-                  <Text style={styles.recentItemTitle}>{item.title}</Text>
-                  <Text style={styles.recentItemSubtitle}>{item.subtitle}</Text>
+                  <Text style={styles.planButtonText}>View Plan</Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
 
-                  <View style={styles.recentItemFooter}>
-                    <View style={styles.recentItemProgress}>
-                      <Icon name="chart-line" size={16} color={theme.primary} />
-                      <Text style={styles.recentItemProgressText}>
-                        {item.progress}%
+            {/* Quick Actions */}
+            <Animated.View
+              style={[
+                styles.section,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Quick Actions
+              </Text>
+              <View style={styles.quickActions}>
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: theme.card }]}
+                  onPress={() => navigation.navigate('Quiz')}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      { backgroundColor: '#E3F2FD' },
+                    ]}
+                  >
+                    <Icon name="help-circle" size={24} color="#2196F3" />
+                  </View>
+                  <Text style={[styles.actionText, { color: theme.text }]}>
+                    Take Quiz
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: theme.card }]}
+                  onPress={() => {
+                    // Fix 1: For SyllabusStack navigation
+                    navigation.navigate('Syllabus', {
+                      screen: 'Syllabus',
+                    });
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      { backgroundColor: '#E8F5E9' },
+                    ]}
+                  >
+                    <Icon name="book-open-variant" size={24} color="#4CAF50" />
+                  </View>
+                  <Text style={[styles.actionText, { color: theme.text }]}>
+                    Syllabus
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: theme.card }]}
+                  onPress={() => {
+                    // Fix 2: For AIGuide navigation
+                    navigation.navigate('AiGuide');
+                  }}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      { backgroundColor: '#FFF3E0' },
+                    ]}
+                  >
+                    <Icon name="robot" size={24} color="#FF9800" />
+                  </View>
+                  <Text style={[styles.actionText, { color: theme.text }]}>
+                    AI Guide
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[styles.actionButton, { backgroundColor: theme.card }]}
+                  onPress={() => navigation.navigate('Analytics')}
+                >
+                  <View
+                    style={[
+                      styles.iconContainer,
+                      { backgroundColor: '#F3E5F5' },
+                    ]}
+                  >
+                    <Icon name="chart-line" size={24} color="#9C27B0" />
+                  </View>
+                  <Text style={[styles.actionText, { color: theme.text }]}>
+                    Analytics
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
+
+            {/* Recent Quiz Results */}
+            <Animated.View
+              style={[
+                styles.section,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                Recent Quiz Results
+              </Text>
+              {recentQuizzes && recentQuizzes.length > 0 ? (
+                recentQuizzes.map((quiz, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.quizCard, { backgroundColor: theme.card }]}
+                    onPress={() =>
+                      navigation.navigate('QuizResult', { quizId: quiz.id })
+                    }
+                  >
+                    <View style={styles.quizInfo}>
+                      <Text
+                        style={[styles.quizTitle, { color: theme.text }]}
+                        numberOfLines={1}
+                      >
+                        {quiz.title}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.quizDate,
+                          { color: theme.textSecondary },
+                        ]}
+                      >
+                        {new Date(quiz.date).toLocaleDateString()}
                       </Text>
                     </View>
-                    <Text style={[styles.statLabel, { marginLeft: 0 }]}>
-                      {item.duration}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-
-          {/* Quote of the day */}
-          {currentQuote && (
-            <View style={[styles.quoteCard, { backgroundColor: theme.card }]}>
-              <Text style={[styles.quoteText, { color: theme.text }]}>
-                "{currentQuote.text}"
-              </Text>
-              <Text style={[styles.quoteAuthor, { color: theme.primary }]}>
-                - {currentQuote.author}
-              </Text>
-            </View>
-          )}
-
-          {/* Today's Tasks */}
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Today's Study Plan
-            </Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Planner')}>
-              <Text style={styles.viewAllText}>View All</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.todayTasksCard}>
-            {localTasks.length > 0 ? (
-              <>
-                {localTasks.map(task => (
-                  <TouchableOpacity
-                    key={task.id}
-                    style={styles.taskItem}
-                    onPress={() => toggleTaskCompletion(task.id)}
-                    activeOpacity={0.7}
-                  >
-                    <View
-                      style={[
-                        styles.priorityIndicator,
-                        { backgroundColor: getPriorityColor(task.priority) },
-                      ]}
-                    />
-
-                    <View style={styles.taskLeft}>
-                      <View style={styles.taskCheckbox}>
-                        <Icon
-                          name={
-                            task.completed
-                              ? 'checkbox-marked-circle'
-                              : 'checkbox-blank-circle-outline'
-                          }
-                          size={24}
-                          color={task.completed ? theme.primary : theme.text}
-                        />
-                      </View>
-
-                      <View style={styles.taskTextContainer}>
-                        <Text
-                          style={[
-                            styles.taskText,
-                            task.completed && {
-                              textDecorationLine: 'line-through',
-                              opacity: 0.7,
-                            },
-                          ]}
-                        >
-                          {task.title}
-                        </Text>
-
-                        <Text
-                          style={[styles.taskSubject, { color: theme.text }]}
-                        >
-                          {task.priority === 'high'
-                            ? 'High Priority'
-                            : task.priority === 'medium'
-                            ? 'Medium Priority'
-                            : 'Low Priority'}
-                        </Text>
-                      </View>
+                    <View style={styles.scoreContainer}>
+                      <Text
+                        style={[
+                          styles.score,
+                          {
+                            color:
+                              quiz.score >= 70
+                                ? '#4CAF50'
+                                : quiz.score >= 40
+                                ? '#FF9800'
+                                : '#F44336',
+                          },
+                        ]}
+                      >
+                        {quiz.score}%
+                      </Text>
                     </View>
-
-                    <Icon name="chevron-right" size={20} color={theme.text} />
                   </TouchableOpacity>
-                ))}
+                ))
+              ) : (
+                <View
+                  style={[styles.emptyState, { backgroundColor: theme.card }]}
+                >
+                  <Icon
+                    name="clipboard-text-outline"
+                    size={48}
+                    color={`${theme.text}30`}
+                  />
+                  <Text
+                    style={[styles.emptyText, { color: theme.textSecondary }]}
+                  >
+                    No quizzes taken yet
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.startButton,
+                      { backgroundColor: theme.primary },
+                    ]}
+                    onPress={() => navigation.navigate('Quiz')}
+                  >
+                    <Text style={styles.startButtonText}>
+                      Take Your First Quiz
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </Animated.View>
 
-                <TouchableOpacity style={styles.actionButton}>
-                  <Icon name="plus" size={20} color="#FFFFFF" />
-                  <Text style={styles.actionButtonText}>Add New Task</Text>
+            {/* Motivational Quote */}
+            <Animated.View
+              style={[
+                styles.section,
+                {
+                  opacity: fadeAnim,
+                  transform: [{ translateY: slideAnim }],
+                },
+              ]}
+            >
+              <View style={styles.sectionTitleContainer}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  Daily Inspiration
+                </Text>
+                <TouchableOpacity
+                  onPress={fetchRandomQuote}
+                  disabled={quoteLoading}
+                  style={styles.refreshQuoteButton}
+                >
+                  <Icon name="refresh" size={20} color={theme.primary} />
                 </TouchableOpacity>
-              </>
-            ) : (
-              <Text style={styles.emptyTaskText}>
-                No tasks scheduled for today
-              </Text>
-            )}
-          </View>
-
-          {/* Quick Actions */}
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>
-              Quick Actions
-            </Text>
-          </View>
-
-          <View style={styles.quickActionsGrid}>
-            <TouchableOpacity
-              style={styles.quickActionItem}
-              onPress={() => navigation.navigate('Timer')}
-            >
-              <View style={styles.quickActionIcon}>
-                <Icon name="play-circle" size={28} color={theme.primary} />
               </View>
-              <Text style={styles.quickActionText}>Start Study Session</Text>
-            </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.quickActionItem}
-              onPress={() => navigation.navigate('Quiz')}
-            >
-              <View style={styles.quickActionIcon}>
-                <Icon name="file-document" size={28} color={theme.primary} />
-              </View>
-              <Text style={styles.quickActionText}>Practice Quizzes</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionItem}
-              onPress={() => navigation.navigate('Analytics')}
-            >
-              <View style={styles.quickActionIcon}>
-                <Icon name="chart-line" size={28} color={theme.primary} />
-              </View>
-              <Text style={styles.quickActionText}>View Analytics</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.quickActionItem}
-              onPress={() => navigation.navigate('Resources')}
-            >
-              <View style={styles.quickActionIcon}>
-                <Icon
-                  name="book-open-variant"
-                  size={28}
-                  color={theme.primary}
-                />
-              </View>
-              <Text style={styles.quickActionText}>Study Resources</Text>
-            </TouchableOpacity>
-          </View>
-        </Animated.View>
-      </Animated.ScrollView>
+              {quoteLoading ? (
+                <View
+                  style={[
+                    styles.quoteLoadingContainer,
+                    { backgroundColor: theme.card },
+                  ]}
+                >
+                  <ActivityIndicator size="small" color={theme.primary} />
+                </View>
+              ) : (
+                <QuoteCard quote={currentQuote} />
+              )}
+            </Animated.View>
+          </>
+        )}
+      </ScrollView>
     </SafeAreaView>
   );
 };
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
+  },
+  greeting: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  subtitle: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  settingsButton: {
+    padding: 8,
+  },
+  scrollContent: {
+    paddingBottom: 24,
+  },
+  section: {
+    marginTop: 16,
+    paddingHorizontal: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  progressCards: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  progressCard: {
+    flex: 1,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginHorizontal: 4,
+  },
+  progressValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginTop: 8,
+  },
+  progressLabel: {
+    fontSize: 12,
+    marginTop: 4,
+    textAlign: 'center',
+  },
+  countdownCard: {
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  countdownDetails: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  daysCount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  daysLabel: {
+    fontSize: 14,
+  },
+  planButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  planButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  actionButton: {
+    width: '48%',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  actionText: {
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  quizCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  quizInfo: {
+    flex: 1,
+  },
+  quizTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  quizDate: {
+    fontSize: 12,
+    marginTop: 4,
+  },
+  scoreContainer: {
+    backgroundColor: '#F5F5F5',
+    height: 48,
+    width: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  score: {
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  errorContainer: {
+    alignItems: 'center',
+    padding: 24,
+    marginTop: 24,
+  },
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  retryButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  emptyState: {
+    padding: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  startButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  startButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  refreshQuoteButton: {
+    padding: 8,
+  },
+  quoteLoadingContainer: {
+    borderRadius: 12,
+    padding: 20,
+    marginVertical: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 100,
+  },
+});
 
 export default HomeScreen;

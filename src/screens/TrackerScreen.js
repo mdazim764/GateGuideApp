@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useContext, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   ScrollView,
   Dimensions,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -14,6 +16,7 @@ import { ThemeContext } from '../theme/ThemeContext';
 import subjects from '../data/subjects';
 import { useApp } from '../context/AppContext';
 import CustomHeader from '../components/CustomHeader';
+import api from '../services/api';
 
 const TABS = [
   { key: 'syllabus', label: 'Syllabus' },
@@ -22,36 +25,81 @@ const TABS = [
   { key: 'analytics', label: 'Analytics' },
 ];
 
+// TrackerScreen API Integration
+const fetchSubjectData = async subjectId => {
+  try {
+    const response = await api.academic.getSubjectDetail(subjectId);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching subject data:', error);
+    return null;
+  }
+};
+
+const fetchTopicProgress = async topicId => {
+  try {
+    const response = await api.progress.getTopicProgress(topicId);
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching topic progress:', error);
+    return { completed: [], total: 0 };
+  }
+};
+
+// Update the fetchAnalytics function
+const fetchAnalytics = async () => {
+  try {
+    // Replace with the correct API endpoint
+    // If getAnalytics doesn't exist, use getSummary which does exist
+    const response = await api.dashboard.getSummary();
+
+    // Transform the data to the format needed by the analytics tab
+    return {
+      daily: {
+        topics: response.data.dailyTopicsCompleted || 0,
+        pyqs: response.data.dailyPyqsAttempted || 0,
+        quizzes: response.data.dailyQuizzesTaken || 0,
+      },
+      weekly: {
+        topics: response.data.weeklyTopicsCompleted || 0,
+        pyqs: response.data.weeklyPyqsAttempted || 0,
+        quizzes: response.data.weeklyQuizzesTaken || 0,
+      },
+      monthly: {
+        topics: response.data.monthlyTopicsCompleted || 0,
+        pyqs: response.data.monthlyPyqsAttempted || 0,
+        quizzes: response.data.monthlyQuizzesTaken || 0,
+      },
+      strengths: response.data.strengths || [],
+      weaknesses: response.data.weaknesses || [],
+      improvement: response.data.improvement || [],
+    };
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    // Return fallback mock data
+    return {
+      daily: { topics: 0, pyqs: 0, quizzes: 0 },
+      weekly: { topics: 0, pyqs: 0, quizzes: 0 },
+      monthly: { topics: 0, pyqs: 0, quizzes: 0 },
+      strengths: [],
+      weaknesses: [],
+      improvement: [],
+    };
+  }
+};
+
 const TrackerScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
   const { progress, updateProgress } = useApp();
 
-  // Get initial tab and selection from params if they exist
-  const initialTab = route.params?.initialTab || 'syllabus';
-  const initialSubjectId = route.params?.selectedSubjectId;
-  const initialTopicId = route.params?.selectedTopicId;
-
-  const [selectedTab, setSelectedTab] = useState(initialTab);
-  const [selectedSubject, setSelectedSubject] = useState(null);
-  const [selectedPyqSubject, setSelectedPyqSubject] = useState(null);
-  const [selectedYear, setSelectedYear] = useState(null);
-
-  // Find the subject if an ID was provided
-  useEffect(() => {
-    if (initialSubjectId) {
-      const foundSubject = subjects.find(s => s.id === initialSubjectId);
-      if (foundSubject) {
-        setSelectedSubject(foundSubject);
-      }
-    }
-  }, [initialSubjectId]);
-
-  // If a topic ID was provided, scroll to it or highlight it
-  useEffect(() => {
-    if (initialSubjectId && initialTopicId) {
-      // Future implementation: scroll to specific topic
-    }
-  }, [initialSubjectId, initialTopicId]);
+  // Add safe destructuring with defaults
+  const {
+    topic,
+    subjectName,
+    initialTab = 'syllabus',
+    selectedSubjectId,
+    selectedTopicId,
+  } = route.params || {};
 
   // --- Progress Calculations ---
   const calculateProgress = () => {
@@ -76,6 +124,127 @@ const TrackerScreen = ({ navigation, route }) => {
     };
   };
 
+  // Now calculateProgress is defined before being used here
+  const [analytics, setAnalytics] = useState({
+    daily: { topics: 0, pyqs: 0, quizzes: 0 },
+    weekly: { topics: 0, pyqs: 0, quizzes: 0 },
+    monthly: { topics: 0, pyqs: 0, quizzes: 0 },
+    overall: calculateProgress(),
+    strengths: [],
+    weaknesses: [],
+    improvement: [],
+  });
+  // Replace mock data initial states with empty structures
+  const [subjectsData, setSubjectsData] = useState([]);
+  const [pyqStats, setPyqStats] = useState({
+    attempted: 0,
+    correct: 0,
+    incorrect: 0,
+    subjects: [],
+  });
+  const [quizzes, setQuizzes] = useState([]);
+
+  // Add state to track selected topic
+  const [selectedTopic, setSelectedTopic] = useState(null);
+
+  // Add this at the top of the component to track selected PYQ
+  const [selectedPyqSubject, setSelectedPyqSubject] = useState(null);
+  const [selectedYear, setSelectedYear] = useState(null);
+  const [pyqQuestions, setPyqQuestions] = useState([]);
+
+  // Add this function to fetch PYQ questions
+  const fetchPyqQuestions = async (subjectId, year = null) => {
+    setIsLoading(prev => ({ ...prev, pyqQuestions: true }));
+
+    try {
+      let response;
+      if (year) {
+        // Fetch questions for specific year and subject
+        response = await api.pyq.getPyqQuestionsBySubjectAndYear(
+          subjectId,
+          year,
+        );
+      } else {
+        // Fetch all questions for subject
+        response = await api.pyq.getPyqQuestionsBySubject(subjectId);
+      }
+
+      console.log('PYQ questions fetched:', response.data);
+      setPyqQuestions(response.data);
+    } catch (err) {
+      console.error('Error loading PYQ questions:', err);
+      Alert.alert('Failed to Load', 'Could not load PYQ questions.');
+    } finally {
+      setIsLoading(prev => ({ ...prev, pyqQuestions: false }));
+    }
+  };
+
+  // Find the subject if an ID was provided
+  React.useEffect(() => {
+    if (selectedSubjectId) {
+      const foundSubject = subjects.find(s => s.id === selectedSubjectId);
+      if (foundSubject) {
+        setSelectedSubject(foundSubject);
+      }
+    }
+  }, [selectedSubjectId]);
+
+  // If a topic ID was provided, scroll to it or highlight it
+  React.useEffect(() => {
+    if (selectedSubjectId && selectedTopicId) {
+      // Future implementation: scroll to specific topic
+    }
+  }, [selectedSubjectId, selectedTopicId]);
+
+  // Add a loadData function
+  const loadData = async () => {
+    if (selectedTab === 'syllabus') {
+      setIsLoading(prev => ({ ...prev, subjects: true }));
+      try {
+        // Use the real API endpoint for syllabus with progress
+        const response = await api.academic.getSyllabusWithProgress();
+        console.log('Syllabus data fetched:', response.data);
+
+        if (response.data) {
+          setSubjectsData(response.data);
+        }
+      } catch (err) {
+        console.error('Error loading syllabus data:', err);
+        // Show error message to user
+        Alert.alert(
+          'Failed to Load',
+          'Could not load syllabus data. Please check your connection and try again.',
+        );
+      } finally {
+        setIsLoading(prev => ({ ...prev, subjects: false }));
+      }
+    } else if (selectedTab === 'pyq') {
+      setIsLoading(prev => ({ ...prev, pyqs: true }));
+      try {
+        // Fetch PYQ statistics from the real API
+        const response = await api.pyq.getAllPyqStats();
+        console.log('PYQ stats fetched:', response.data);
+
+        if (response.data) {
+          setPyqStats(response.data);
+        }
+      } catch (err) {
+        console.error('Error loading PYQ data:', err);
+        Alert.alert(
+          'Failed to Load',
+          'Could not load PYQ data. Please check your connection and try again.',
+        );
+      } finally {
+        setIsLoading(prev => ({ ...prev, pyqs: false }));
+      }
+    }
+  };
+
+  // Call this in a useEffect
+  React.useEffect(() => {
+    loadData();
+  }, [selectedTab]);
+
   const calculateSubjectProgress = subjectId => {
     const subject = subjects.find(s => s.id === subjectId);
     if (!subject) return { percentage: 0, completed: 0, total: 0 };
@@ -93,6 +262,218 @@ const TrackerScreen = ({ navigation, route }) => {
       completed: completedTopics,
       total: subject.topics.length,
     };
+  };
+  const toggleSubtopic = async subtopic => {
+    if (!subtopic) return; // Safety check
+
+    const subtopicId = subtopic.id;
+    const newCompletedState = !completedSubtopics.has(subtopicId);
+
+    // Start loading state for this item
+    setLoading(prev => ({ ...prev, [subtopicId]: true }));
+
+    try {
+      // Call API to update progress
+      await api.progress.markSubtopicCompleted(subtopicId);
+
+      // Update local state
+      const newCompletedSubtopics = new Set(completedSubtopics);
+      if (newCompletedState) {
+        newCompletedSubtopics.add(subtopicId);
+      } else {
+        newCompletedSubtopics.delete(subtopicId);
+      }
+      setCompletedSubtopics(newCompletedSubtopics);
+    } catch (error) {
+      console.error('Error updating progress:', error);
+      Alert.alert(
+        'Update Failed',
+        'Could not update your progress. Please try again.',
+      );
+    } finally {
+      // Stop loading state for this item
+      setLoading(prev => ({ ...prev, [subtopicId]: false }));
+    }
+  };
+
+  // Add this function to handle topic progress updates
+  const handleTopicPress = async (subjectId, unitId, topicId) => {
+    // Set loading state for this topic
+    setLoading(prev => ({ ...prev, [topicId]: true }));
+
+    try {
+      // Find the topic to determine current state
+      const subject = subjectsData.find(s => s.id === subjectId);
+      const unit = subject?.units.find(u => u.id === unitId);
+      const topic = unit?.topics.find(t => t.id === topicId);
+
+      if (!topic) {
+        console.error('Topic not found');
+        return;
+      }
+
+      // Toggle completion status
+      const newCompletedState = !topic.completed;
+
+      // Call API to update the topic status
+      await api.progress.updateTopicProgress(topicId, newCompletedState);
+
+      // Update local state
+      setSubjectsData(prevData => {
+        return prevData.map(s => {
+          if (s.id !== subjectId) return s;
+
+          return {
+            ...s,
+            units: s.units.map(u => {
+              if (u.id !== unitId) return u;
+
+              return {
+                ...u,
+                topics: u.topics.map(t => {
+                  if (t.id !== topicId) return t;
+
+                  return {
+                    ...t,
+                    completed: newCompletedState,
+                  };
+                }),
+              };
+            }),
+          };
+        });
+      });
+
+      // Show success message
+      // Alert.alert("Success", "Progress updated successfully!");
+    } catch (error) {
+      console.error('Error updating topic progress:', error);
+      Alert.alert('Error', 'Failed to update progress. Please try again.');
+    } finally {
+      // Clear loading state
+      setLoading(prev => ({ ...prev, [topicId]: false }));
+    }
+  };
+
+  // Add the topic detail view
+  if (selectedTopic && selectedTab === 'syllabus') {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
+        <CustomHeader
+          title={selectedTopic.name}
+          navigation={navigation}
+          onBack={() => setSelectedTopic(null)}
+        />
+
+        {/* Overall subject progress */}
+        <View
+          style={[
+            styles.overallCard,
+            {
+              backgroundColor: theme.card,
+              margin: 16,
+              padding: 16,
+              borderRadius: 12,
+            },
+          ]}
+        >
+          <Text style={[styles.overallTitle, { color: theme.text }]}>
+            Subtopics Progress
+          </Text>
+          <View style={styles.progressContainer}>
+            <View
+              style={[
+                styles.progressBar,
+                {
+                  width: `${
+                    (selectedTopic.subtopics.filter(st => st.completed).length /
+                      selectedTopic.subtopics.length) *
+                    100
+                  }%`,
+                  backgroundColor: theme.primary,
+                },
+              ]}
+            />
+          </View>
+          <Text style={[styles.overallText, { color: theme.text }]}>
+            {selectedTopic.subtopics.filter(st => st.completed).length}/
+            {selectedTopic.subtopics.length} subtopics completed
+          </Text>
+        </View>
+
+        <FlatList
+          data={selectedTopic.subtopics}
+          keyExtractor={item => item.id}
+          renderItem={({ item: subtopic }) => (
+            <TouchableOpacity
+              style={[
+                styles.subtopicItem,
+                {
+                  backgroundColor: theme.card,
+                  padding: 16,
+                  borderRadius: 8,
+                  marginHorizontal: 16,
+                  marginBottom: 8,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                },
+              ]}
+              onPress={() => toggleSubtopicStatus(subtopic.id)}
+            >
+              <Text
+                style={[styles.subtopicName, { color: theme.text, flex: 1 }]}
+              >
+                {subtopic.name}
+              </Text>
+
+              {loading[subtopic.id] ? (
+                <ActivityIndicator size="small" color={theme.primary} />
+              ) : (
+                <Icon
+                  name={subtopic.completed ? 'check-circle' : 'circle-outline'}
+                  size={24}
+                  color={subtopic.completed ? theme.primary : theme.text}
+                />
+              )}
+            </TouchableOpacity>
+          )}
+        />
+      </SafeAreaView>
+    );
+  }
+
+  // Add function to toggle subtopic status
+  const toggleSubtopicStatus = async subtopicId => {
+    // Set loading state
+    setLoading(prev => ({ ...prev, [subtopicId]: true }));
+
+    try {
+      // Find subtopic in current topic
+      const subtopic = selectedTopic.subtopics.find(s => s.id === subtopicId);
+      if (!subtopic) return;
+
+      // Toggle status
+      const newStatus = !subtopic.completed;
+
+      // Call API
+      await api.progress.updateSubtopicProgress(subtopicId, newStatus);
+
+      // Update local state
+      setSelectedTopic(prevTopic => ({
+        ...prevTopic,
+        subtopics: prevTopic.subtopics.map(s =>
+          s.id === subtopicId ? { ...s, completed: newStatus } : s,
+        ),
+      }));
+    } catch (error) {
+      console.error('Error updating subtopic progress:', error);
+      Alert.alert('Error', 'Failed to update subtopic progress');
+    } finally {
+      setLoading(prev => ({ ...prev, [subtopicId]: false }));
+    }
   };
 
   // --- Tab UI ---
@@ -126,8 +507,85 @@ const TrackerScreen = ({ navigation, route }) => {
   );
 
   // --- Syllabus Tab ---
+  // const renderSubjectItem = ({ item }) => {
+  //   // Calculate progress using the API data
+  //   const subjectProgress = calculateSubjectProgressFromData(item);
+
+  //   return (
+  //     <TouchableOpacity
+  //       style={[styles.subjectCard, { backgroundColor: theme.card }]}
+  //       onPress={() => setSelectedSubject(item)}
+  //     >
+  //       <View style={styles.subjectInfo}>
+  //         <Text style={[styles.subjectTitle, { color: theme.text }]}>
+  //           {item.name}
+  //         </Text>
+  //         <Text style={[styles.progressText, { color: theme.text }]}>
+  //           {subjectProgress.completed}/{subjectProgress.total} topics completed
+  //         </Text>
+  //         <View style={styles.progressContainer}>
+  //           <View
+  //             style={[
+  //               styles.progressBar,
+  //               {
+  //                 width: `${subjectProgress.percentage}%`,
+  //                 backgroundColor: theme.primary,
+  //               },
+  //             ]}
+  //           />
+  //         </View>
+  //       </View>
+  //       <Icon name="chevron-right" size={24} color={theme.primary} />
+  //     </TouchableOpacity>
+  //   );
+  // };
+
+  // Helper function to calculate progress from API data with 4-layer structure
+  const calculateSubjectProgressFromData = subject => {
+    let totalTopics = 0;
+    let completedTopics = 0;
+
+    // Handle the 4-layer structure: Subject -> Unit -> Topic -> Subtopic
+    if (subject.units) {
+      subject.units.forEach(unit => {
+        if (unit.topics) {
+          unit.topics.forEach(topic => {
+            // Count each topic
+            totalTopics++;
+
+            // Check if topic is marked as completed
+            if (topic.completed) {
+              completedTopics++;
+            }
+
+            // Optional: Check if all subtopics are completed to mark topic as completed
+            if (topic.subtopics && topic.subtopics.length > 0) {
+              const allSubtopicsCompleted = topic.subtopics.every(
+                st => st.completed,
+              );
+              if (allSubtopicsCompleted && !topic.completed) {
+                // If all subtopics are completed but topic isn't marked completed
+                // You could update this via API if needed
+              }
+            }
+          });
+        }
+      });
+    }
+
+    return {
+      percentage:
+        totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0,
+      completed: completedTopics,
+      total: totalTopics,
+    };
+  };
+
+  // Update renderSubjectItem to handle the 4-layer structure
   const renderSubjectItem = ({ item }) => {
-    const subjectProgress = calculateSubjectProgress(item.id);
+    // Calculate progress using the API data
+    const subjectProgress = calculateSubjectProgressFromData(item);
+
     return (
       <TouchableOpacity
         style={[styles.subjectCard, { backgroundColor: theme.card }]}
@@ -157,223 +615,247 @@ const TrackerScreen = ({ navigation, route }) => {
     );
   };
 
-  const toggleTopicStatus = (subjectId, topicId) => {
-    const currentStatus = progress[subjectId]?.[topicId];
-    const newStatus = currentStatus === 'completed' ? 'pending' : 'completed';
-    updateProgress(subjectId, topicId, newStatus);
-  };
-
   // --- PYQ Tab (Enhanced) ---
   // Mock data for PYQ years
-  const pyqYears = [
-    '2023',
-    '2022',
-    '2021',
-    '2020',
-    '2019',
-    '2018',
-    '2017',
-    '2016',
-    '2015',
-    '2014',
-  ];
+  // const pyqYears = [
+  //   '2023',
+  //   '2022',
+  //   '2021',
+  //   '2020',
+  //   '2019',
+  //   '2018',
+  //   '2017',
+  //   '2016',
+  //   '2015',
+  //   '2014',
+  // ];
 
-  // Mock data for PYQ questions
-  const mockPyqQuestions = [
-    {
-      id: '1',
-      year: '2022',
-      question:
-        'Which of the following scheduling algorithms may lead to starvation?',
-      options: [
-        'Round Robin',
-        'First Come First Serve',
-        'Priority Scheduling',
-        'Shortest Job First',
-      ],
-      answer: 2, // Priority Scheduling
-      explanation:
-        'Priority scheduling may lead to starvation if lower priority processes keep waiting because higher priority processes are continuously arriving.',
-      difficulty: 'Medium',
-      attempted: true,
-      userAnswer: 2,
-      isCorrect: true,
-    },
-    {
-      id: '2',
-      year: '2022',
-      question:
-        'Consider a virtual memory system with FIFO page replacement policy. For an arbitrary page access pattern, increasing the number of page frames in main memory will',
-      options: [
-        'Always decrease the number of page faults',
-        'Always increase the number of page faults',
-        'Sometimes increase the number of page faults',
-        'Never affect the number of page faults',
-      ],
-      answer: 2, // Sometimes increase
-      explanation:
-        "This is known as Belady's Anomaly, which occurs with FIFO replacement policy. Increasing the page frames can sometimes lead to more page faults.",
-      difficulty: 'Hard',
-      attempted: true,
-      userAnswer: 0,
-      isCorrect: false,
-    },
-    {
-      id: '3',
-      year: '2022',
-      question: "Which of the following is true about the Banker's algorithm?",
-      options: [
-        'It is a deadlock detection algorithm',
-        'It is a deadlock prevention algorithm',
-        'It is a deadlock avoidance algorithm',
-        'It is a deadlock recovery algorithm',
-      ],
-      answer: 2, // Avoidance
-      explanation:
-        "Banker's algorithm is a deadlock avoidance algorithm that ensures the system never enters an unsafe state where deadlock might occur.",
-      difficulty: 'Medium',
-      attempted: false,
-      userAnswer: null,
-      isCorrect: null,
-    },
-  ];
-
-  const pyqStats = {
-    attempted: 120,
-    correct: 98,
-    incorrect: 22,
-    subjects: subjects.map(s => ({
-      ...s,
-      pyq: {
-        attempted: Math.floor(Math.random() * 30) + 10,
-        correct: Math.floor(Math.random() * 25) + 5,
-        incorrect: Math.floor(Math.random() * 10) + 1,
-        questions: mockPyqQuestions,
-        yearWiseAttempts: pyqYears.map(year => ({
-          year,
-          attempted: Math.floor(Math.random() * 20),
-          correct: Math.floor(Math.random() * 15),
-          total: 20 + Math.floor(Math.random() * 10),
-        })),
-      },
-      topics: s.topics
-        ? s.topics.map(topic => ({
-            ...topic,
-            correctPercentage: Math.floor(Math.random() * 100),
-          }))
-        : [],
-    })),
-  };
+  // const pyqStats = {
+  //   attempted: 120,
+  //   correct: 98,
+  //   incorrect: 22,
+  //   subjects: subjects.map(s => ({
+  //     ...s,
+  //     pyq: {
+  //       attempted: Math.floor(Math.random() * 30) + 10,
+  //       correct: Math.floor(Math.random() * 25) + 5,
+  //       incorrect: Math.floor(Math.random() * 10) + 1,
+  //       questions: mockPyqQuestions,
+  //       yearWiseAttempts: pyqYears.map(year => ({
+  //         year,
+  //         attempted: Math.floor(Math.random() * 20),
+  //         correct: Math.floor(Math.random() * 15),
+  //         total: 20 + Math.floor(Math.random() * 10),
+  //       })),
+  //     },
+  //     topics: s.topics
+  //       ? s.topics.map(topic => ({
+  //           ...topic,
+  //           correctPercentage: Math.floor(Math.random() * 100),
+  //         }))
+  //       : [],
+  //   })),
+  // };
 
   // --- Quizzes Tab (Enhanced) ---
-  const quizzes = [
-    {
-      id: '1',
-      subject: 'Operating Systems',
-      score: 85,
-      date: '2025-07-20',
-      time: '18m',
-      questionCount: 15,
-      correctCount: 13,
-      topicsCovered: [
-        'Process Scheduling',
-        'Memory Management',
-        'File Systems',
-      ],
-      trend: 'up',
-    },
-    {
-      id: '2',
-      subject: 'Data Structures',
-      score: 78,
-      date: '2025-07-18',
-      time: '22m',
-      questionCount: 20,
-      correctCount: 16,
-      topicsCovered: ['Arrays', 'Linked Lists', 'Trees', 'Graphs'],
-      trend: 'down',
-    },
-    {
-      id: '3',
-      subject: 'Computer Networks',
-      score: 92,
-      date: '2025-07-15',
-      time: '15m',
-      questionCount: 12,
-      correctCount: 11,
-      topicsCovered: ['OSI Model', 'TCP/IP', 'Routing'],
-      trend: 'up',
-    },
-  ];
+  // const quizzes = [
+  //   {
+  //     id: '1',
+  //     subject: 'Operating Systems',
+  //     score: 85,
+  //     date: '2025-07-20',
+  //     time: '18m',
+  //     questionCount: 15,
+  //     correctCount: 13,
+  //     topicsCovered: [
+  //       'Process Scheduling',
+  //       'Memory Management',
+  //       'File Systems',
+  //     ],
+  //     trend: 'up',
+  //   },
+  //   {
+  //     id: '2',
+  //     subject: 'Data Structures',
+  //     score: 78,
+  //     date: '2025-07-18',
+  //     time: '22m',
+  //     questionCount: 20,
+  //     correctCount: 16,
+  //     topicsCovered: ['Arrays', 'Linked Lists', 'Trees', 'Graphs'],
+  //     trend: 'down',
+  //   },
+  //   {
+  //     id: '3',
+  //     subject: 'Computer Networks',
+  //     score: 92,
+  //     date: '2025-07-15',
+  //     time: '15m',
+  //     questionCount: 12,
+  //     correctCount: 11,
+  //     topicsCovered: ['OSI Model', 'TCP/IP', 'Routing'],
+  //     trend: 'up',
+  //   },
+  // ];
 
-  // --- Analytics Tab (Mock Data) ---
-  const analytics = {
-    daily: { topics: 3, pyqs: 8, quizzes: 1 },
-    weekly: { topics: 18, pyqs: 42, quizzes: 4 },
-    monthly: { topics: 65, pyqs: 160, quizzes: 12 },
-    overall: calculateProgress(),
-    strengths: ['Operating Systems', 'Database Systems'],
-    weaknesses: ['Computer Networks', 'Theory of Computation'],
-    improvement: ['Discrete Mathematics', 'Algorithm Analysis'],
-    studyTime: {
-      mon: 4.5,
-      tue: 3.2,
-      wed: 5.0,
-      thu: 2.5,
-      fri: 4.0,
-      sat: 6.0,
-      sun: 3.5,
-    },
-  };
+  // --- Analytics Tab - Enhanced ---
+  // const analytics = {
+  //   daily: { topics: 3, pyqs: 8, quizzes: 1 },
+  //   weekly: { topics: 18, pyqs: 42, quizzes: 4 },
+  //   monthly: { topics: 65, pyqs: 160, quizzes: 12 },
+  //   overall: calculateProgress(),
+  //   strengths: ['Operating Systems', 'Database Systems'],
+  //   weaknesses: ['Computer Networks', 'Theory of Computation'],
+  //   improvement: ['Discrete Mathematics', 'Algorithm Analysis'],
+  //   studyTime: {
+  //     mon: 4.5,
+  //     tue: 3.2,
+  //     wed: 5.0,
+  //     thu: 2.5,
+  //     fri: 4.0,
+  //     sat: 6.0,
+  //     sun: 3.5,
+  //   },
+  // };
 
   // --- Subject Detail for Syllabus ---
   if (selectedSubject && selectedTab === 'syllabus') {
-    const subjectProgress = calculateSubjectProgress(selectedSubject.id);
     return (
       <SafeAreaView
         style={[styles.container, { backgroundColor: theme.background }]}
       >
         <CustomHeader
           title={selectedSubject.name}
+          navigation={navigation}
           onBack={() => setSelectedSubject(null)}
         />
+
+        {/* Overall subject progress */}
+        <View
+          style={[
+            styles.overallCard,
+            {
+              backgroundColor: theme.card,
+              margin: 16,
+              padding: 16,
+              borderRadius: 12,
+            },
+          ]}
+        >
+          <Text style={[styles.overallTitle, { color: theme.text }]}>
+            Overall Progress
+          </Text>
+          <View style={styles.progressContainer}>
+            <View
+              style={[
+                styles.progressBar,
+                {
+                  width: `${
+                    calculateSubjectProgressFromData(selectedSubject).percentage
+                  }%`,
+                  backgroundColor: theme.primary,
+                },
+              ]}
+            />
+          </View>
+          <Text style={[styles.overallText, { color: theme.text }]}>
+            {calculateSubjectProgressFromData(selectedSubject).percentage}%
+            Complete
+          </Text>
+        </View>
+
+        {/* Units List */}
         <FlatList
-          data={selectedSubject.topics}
+          data={selectedSubject.units || []}
           keyExtractor={item => item.id}
-          renderItem={({ item }) => {
-            const isCompleted =
-              progress[selectedSubject.id]?.[item.id] === 'completed';
-            return (
-              <TouchableOpacity
+          renderItem={({ item: unit }) => (
+            <View
+              style={[
+                styles.unitContainer,
+                { marginBottom: 16, paddingHorizontal: 16 },
+              ]}
+            >
+              <Text
                 style={[
-                  styles.topicItem,
+                  styles.unitTitle,
                   {
-                    backgroundColor: theme.card,
-                    borderLeftWidth: 4,
-                    borderLeftColor: isCompleted
-                      ? theme.primary
-                      : 'transparent',
+                    color: theme.text,
+                    fontSize: 18,
+                    fontWeight: 'bold',
+                    marginBottom: 8,
                   },
                 ]}
-                onPress={() => toggleTopicStatus(selectedSubject.id, item.id)}
               >
-                <View style={styles.topicContent}>
-                  <Text style={[styles.topicName, { color: theme.text }]}>
-                    {item.name}
-                  </Text>
-                  <Text style={[styles.weightageText, { color: theme.text }]}>
-                    Weightage: {item.weightage}
-                  </Text>
-                </View>
-                <Icon
-                  name={isCompleted ? 'check-circle' : 'circle-outline'}
-                  size={24}
-                  color={isCompleted ? theme.primary : theme.text}
-                />
-              </TouchableOpacity>
-            );
-          }}
-          contentContainerStyle={styles.list}
+                {unit.name}
+              </Text>
+
+              {/* Topics within this unit */}
+              {unit.topics &&
+                unit.topics.map(topic => (
+                  <TouchableOpacity
+                    key={topic.id}
+                    style={[
+                      styles.topicItem,
+                      {
+                        backgroundColor: theme.card,
+                        borderLeftWidth: 4,
+                        borderLeftColor: topic.completed
+                          ? theme.primary
+                          : 'transparent',
+                        marginBottom: 8,
+                        borderRadius: 8,
+                      },
+                    ]}
+                    onPress={() =>
+                      handleTopicPress(selectedSubject.id, unit.id, topic.id)
+                    }
+                  >
+                    <View style={styles.topicContent}>
+                      <Text
+                        style={[
+                          styles.topicName,
+                          { color: theme.text, fontWeight: '500' },
+                        ]}
+                      >
+                        {topic.name}
+                      </Text>
+
+                      {/* Subtopic count or completion status */}
+                      <Text
+                        style={[
+                          styles.subtopicCount,
+                          {
+                            color: theme.textSecondary,
+                            fontSize: 12,
+                            marginTop: 4,
+                          },
+                        ]}
+                      >
+                        {topic.subtopics
+                          ? `${
+                              topic.subtopics.filter(st => st.completed).length
+                            }/${topic.subtopics.length} subtopics`
+                          : 'No subtopics'}
+                      </Text>
+                    </View>
+
+                    <Icon
+                      name={topic.completed ? 'check-circle' : 'circle-outline'}
+                      size={24}
+                      color={topic.completed ? theme.primary : theme.text}
+                    />
+                  </TouchableOpacity>
+                ))}
+            </View>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Icon name="book-outline" size={64} color={`${theme.text}20`} />
+              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+                No units found in this subject
+              </Text>
+            </View>
+          }
         />
       </SafeAreaView>
     );
@@ -398,6 +880,7 @@ const TrackerScreen = ({ navigation, route }) => {
         >
           <CustomHeader
             title={`${subject.name} - ${selectedYear} PYQs`}
+            navigation={navigation}
             onBack={() => setSelectedYear(null)}
           />
 
@@ -576,6 +1059,7 @@ const TrackerScreen = ({ navigation, route }) => {
       >
         <CustomHeader
           title={`${subject.name} PYQs`}
+          navigation={navigation}
           onBack={() => setSelectedPyqSubject(null)}
         />
 
@@ -727,6 +1211,7 @@ const TrackerScreen = ({ navigation, route }) => {
     >
       <CustomHeader
         title="Study Progress Tracker"
+        navigation={navigation}
         onBack={() => navigation.goBack()}
       />
       {renderTabs()}
@@ -954,9 +1439,9 @@ const TrackerScreen = ({ navigation, route }) => {
                   navigation.navigate('MoreTab', {
                     screen: 'Quiz',
                     params: {
-                      quizType: 'pyq',
-                      questionCount: 10,
-                      difficulty: 'medium',
+                      mode: 'pyq',
+                      subjectId: subject.id,
+                      subjectName: subject.name,
                     },
                   });
                 }}
@@ -1335,6 +1820,16 @@ const TrackerScreen = ({ navigation, route }) => {
             </View>
           </>
         )}
+
+        {/* Add this conditional rendering for loading states */}
+        {isLoading[selectedTab] && (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.primary} />
+            <Text style={[styles.loadingText, { color: theme.text }]}>
+              Loading {selectedTab} data...
+            </Text>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -1349,27 +1844,35 @@ const StatBox = ({ icon, label, value, theme }) => (
   </View>
 );
 
-const AnalyticsBox = ({ label, data, theme }) => (
-  <View style={[styles.analyticsBox, { backgroundColor: theme.card }]}>
-    <Text style={[styles.analyticsLabel, { color: theme.primary }]}>
-      {label}
-    </Text>
-    <Text style={[styles.analyticsText, { color: theme.text }]}>
-      Topics: {data.topics ?? data.completed ?? 0}
-    </Text>
-    <Text style={[styles.analyticsText, { color: theme.text }]}>
-      PYQs: {data.pyqs ?? 0}
-    </Text>
-    <Text style={[styles.analyticsText, { color: theme.text }]}>
-      Quizzes: {data.quizzes ?? 0}
-    </Text>
-    {data.percentage !== undefined && (
-      <Text style={[styles.analyticsText, { color: theme.text }]}>
-        Completion: {data.percentage}%
+const AnalyticsBox = ({ label, data, theme }) => {
+  // Safely access data properties
+  const topics = data?.topics ?? data?.completed ?? 0;
+  const pyqs = data?.pyqs ?? 0;
+  const quizzes = data?.quizzes ?? 0;
+  const percentage = data?.percentage;
+
+  return (
+    <View style={[styles.analyticsBox, { backgroundColor: theme.card }]}>
+      <Text style={[styles.analyticsLabel, { color: theme.primary }]}>
+        {label}
       </Text>
-    )}
-  </View>
-);
+      <Text style={[styles.analyticsText, { color: theme.text }]}>
+        Topics: {topics}
+      </Text>
+      <Text style={[styles.analyticsText, { color: theme.text }]}>
+        PYQs: {pyqs}
+      </Text>
+      <Text style={[styles.analyticsText, { color: theme.text }]}>
+        Quizzes: {quizzes}
+      </Text>
+      {percentage !== undefined && (
+        <Text style={[styles.analyticsText, { color: theme.text }]}>
+          Completion: {percentage}%
+        </Text>
+      )}
+    </View>
+  );
+};
 
 const InsightItem = ({ title, items, iconName, theme, color }) => (
   <View style={{ marginBottom: 12 }}>
@@ -1666,6 +2169,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     elevation: 3,
+  },
+  // Loading
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 16,
+    color: '#666',
   },
 });
 

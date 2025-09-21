@@ -2,6 +2,7 @@ import React, { useState, useContext, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   TouchableOpacity,
   FlatList,
@@ -9,13 +10,22 @@ import {
   ScrollView,
   Dimensions,
   ImageBackground,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ThemeContext } from '../theme/ThemeContext';
-import CustomHeader from '../components/CustomHeader'; // Import your custom header
+import api from '../services/api';
 
 const { width } = Dimensions.get('window');
+
+const resourceTypes = [
+  { id: 'All', label: 'All', icon: 'format-list-bulleted' },
+  { id: 'pdf', label: 'PDFs', icon: 'file-pdf-box' },
+  { id: 'video', label: 'Videos', icon: 'video' },
+  { id: 'quiz', label: 'Quizzes', icon: 'help-circle' },
+  { id: 'notes', label: 'Notes', icon: 'notebook' },
+];
 
 const ResourcesScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
@@ -30,170 +40,247 @@ const ResourcesScreen = ({ navigation, route }) => {
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [resources, setResources] = useState([]);
   const [filteredResources, setFilteredResources] = useState([]);
+  const [subjects, setSubjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [playlists, setPlaylists] = useState([]);
+  const [loadingPlaylists, setLoadingPlaylists] = useState(true);
+  const [playlistError, setPlaylistError] = useState(null);
 
-  // Define subjects and resource types
-  const subjects = [
-    { id: 'All', name: 'All', abbr: 'All' },
-    { id: 'Operating Systems', name: 'Operating Systems', abbr: 'OS' },
-    { id: 'Data Structures', name: 'Data Structures', abbr: 'DS' },
-    { id: 'Computer Networks', name: 'Computer Networks', abbr: 'CN' },
-    { id: 'Algorithms', name: 'Algorithms', abbr: 'Algo' },
-    { id: 'Database Systems', name: 'Database Systems', abbr: 'DBMS' },
-    { id: 'Theory of Computation', name: 'Theory of Computation', abbr: 'TOC' },
-    { id: 'Digital Logic', name: 'Digital Logic', abbr: 'DL' },
-    { id: 'Mathematics', name: 'Mathematics', abbr: 'Math' },
-  ];
-
-  const resourceTypes = [
-    { id: 'All', icon: 'view-grid', label: 'All' },
-    { id: 'pdf', icon: 'file-pdf-box', label: 'PDFs' },
-    { id: 'video', icon: 'video', label: 'Videos' },
-    { id: 'quiz', icon: 'help-box', label: 'Quizzes' },
-    { id: 'notes', icon: 'notebook', label: 'Notes' },
-  ];
-
-  // Initialize with sample data
+  // Fetch subjects from API
   useEffect(() => {
-    const mockResources = [
-      {
-        id: '1',
-        title: 'Process Scheduling Algorithms',
-        subject: 'Operating Systems',
-        type: 'pdf',
-        author: 'Dr. P. Govindarajulu',
-        size: '3.2 MB',
-        duration: null,
-        description:
-          'Comprehensive guide covering FCFS, SJF, Priority, and Round Robin scheduling algorithms with examples.',
-        tags: ['process scheduling', 'CPU scheduling', 'algorithms'],
-        downloads: 345,
-        rating: 4.7,
-        dateAdded: '2023-10-15',
-      },
-      {
-        id: '2',
-        title: 'Memory Management Techniques',
-        subject: 'Operating Systems',
-        type: 'video',
-        author: 'Prof. Ajit Singh',
-        size: null,
-        duration: '28:45',
-        description:
-          'Visual explanation of paging, segmentation, and virtual memory concepts.',
-        tags: ['memory management', 'paging', 'segmentation', 'virtual memory'],
-        views: 1203,
-        rating: 4.5,
-        dateAdded: '2023-09-22',
-      },
-      {
-        id: '3',
-        title: 'Graph Algorithms Practice Quiz',
-        subject: 'Algorithms',
-        type: 'quiz',
-        author: 'GATE Prep Team',
-        size: null,
-        duration: '45 min',
-        description:
-          '25 questions covering BFS, DFS, shortest path, and minimum spanning trees.',
-        tags: ['graphs', 'algorithms', 'BFS', 'DFS', 'Dijkstra'],
-        attempts: 856,
-        rating: 4.8,
-        dateAdded: '2023-11-05',
-      },
-      {
-        id: '4',
-        title: 'TCP/IP Protocol Suite',
-        subject: 'Computer Networks',
-        type: 'pdf',
-        author: 'Prof. Neha Sharma',
-        size: '5.7 MB',
-        duration: null,
-        description:
-          'Detailed explanation of the TCP/IP protocol suite with diagrams and examples.',
-        tags: ['TCP/IP', 'networking', 'protocols'],
-        downloads: 512,
-        rating: 4.6,
-        dateAdded: '2023-08-30',
-      },
-      {
-        id: '5',
-        title: 'Database Normalization',
-        subject: 'Database Systems',
-        type: 'video',
-        author: 'Dr. Ramesh Kumar',
-        size: null,
-        duration: '42:18',
-        description:
-          'Step-by-step tutorial on normalization forms (1NF through BCNF) with examples.',
-        tags: ['database', 'normalization', 'SQL'],
-        views: 978,
-        rating: 4.9,
-        dateAdded: '2023-10-02',
-      },
-      {
-        id: '6',
-        title: 'Binary Trees Implementation',
-        subject: 'Data Structures',
-        type: 'notes',
-        author: 'Prof. Sunil Gupta',
-        size: '1.8 MB',
-        duration: null,
-        description:
-          'Hand-written notes covering binary tree operations, traversals, and implementations.',
-        tags: ['binary trees', 'data structures', 'traversals'],
-        downloads: 723,
-        rating: 4.5,
-        dateAdded: '2023-09-18',
-      },
-      {
-        id: '7',
-        title: 'Automata Theory Fundamentals',
-        subject: 'Theory of Computation',
-        type: 'pdf',
-        author: 'Dr. Kavitha Raman',
-        size: '4.1 MB',
-        duration: null,
-        description:
-          'Complete study material covering finite automata, regular expressions, and formal languages.',
-        tags: ['automata', 'formal languages', 'DFA', 'NFA'],
-        downloads: 631,
-        rating: 4.8,
-        dateAdded: '2023-11-12',
-      },
-      {
-        id: '8',
-        title: 'Digital Logic Design Quiz',
-        subject: 'Digital Logic',
-        type: 'quiz',
-        author: 'GATE Prep Team',
-        size: null,
-        duration: '30 min',
-        description:
-          '20 questions on boolean algebra, combinational and sequential circuits.',
-        tags: ['digital logic', 'boolean algebra', 'circuits'],
-        attempts: 542,
-        rating: 4.6,
-        dateAdded: '2023-10-25',
-      },
-      {
-        id: '9',
-        title: 'Probability and Statistics for CS',
-        subject: 'Mathematics',
-        type: 'video',
-        author: 'Prof. Anand Verma',
-        size: null,
-        duration: '53:20',
-        description:
-          'Key concepts of probability, random variables, and statistical inference for computer science.',
-        tags: ['probability', 'statistics', 'mathematics'],
-        views: 845,
-        rating: 4.7,
-        dateAdded: '2023-09-08',
-      },
-    ];
+    const fetchSubjects = async () => {
+      try {
+        const response = await api.academic.getSubjects();
 
-    setResources(mockResources);
-    setFilteredResources(mockResources);
+        // Add "All" option to subjects
+        const allSubjects = [
+          { id: 'All', name: 'All', abbr: 'All' },
+          ...response.data.map(subject => ({
+            id: subject.id,
+            name: subject.name,
+            abbr: subject.code || subject.name.substring(0, 2),
+          })),
+        ];
+
+        setSubjects(allSubjects);
+      } catch (err) {
+        console.error('Error fetching subjects:', err);
+        // Fallback to static subjects if API fails
+        setSubjects([
+          { id: 'All', name: 'All', abbr: 'All' },
+          { id: 'Operating Systems', name: 'Operating Systems', abbr: 'OS' },
+          { id: 'Data Structures', name: 'Data Structures', abbr: 'DS' },
+          { id: 'Computer Networks', name: 'Computer Networks', abbr: 'CN' },
+          { id: 'Algorithms', name: 'Algorithms', abbr: 'Algo' },
+          { id: 'Database Systems', name: 'Database Systems', abbr: 'DBMS' },
+          {
+            id: 'Theory of Computation',
+            name: 'Theory of Computation',
+            abbr: 'TOC',
+          },
+          { id: 'Digital Logic', name: 'Digital Logic', abbr: 'DL' },
+          { id: 'Mathematics', name: 'Mathematics', abbr: 'Math' },
+        ]);
+      }
+    };
+
+    fetchSubjects();
+  }, []);
+
+  // Fetch resources based on filters
+  useEffect(() => {
+    const fetchResources = async () => {
+      try {
+        setLoading(true);
+
+        const filters = {};
+        if (activeSubject !== 'All') {
+          filters.subjectId = activeSubject;
+        }
+        if (activeResourceType !== 'All') {
+          filters.type = activeResourceType;
+        }
+        if (searchQuery) {
+          filters.search = searchQuery;
+        }
+
+        const response = await api.resources.getAll(filters);
+        setResources(response.data);
+        setFilteredResources(response.data);
+      } catch (err) {
+        console.error('Error fetching resources:', err);
+        setError('Failed to load resources');
+        // Fallback to mock data if API fails
+        const mockResources = [
+          {
+            id: '1',
+            title: 'Process Scheduling Algorithms',
+            subject: 'Operating Systems',
+            type: 'pdf',
+            author: 'Dr. P. Govindarajulu',
+            size: '3.2 MB',
+            duration: null,
+            description:
+              'Comprehensive guide covering FCFS, SJF, Priority, and Round Robin scheduling algorithms with examples.',
+            tags: ['process scheduling', 'CPU scheduling', 'algorithms'],
+            downloads: 345,
+            rating: 4.7,
+            dateAdded: '2023-10-15',
+          },
+          {
+            id: '2',
+            title: 'Memory Management Techniques',
+            subject: 'Operating Systems',
+            type: 'video',
+            author: 'Prof. Ajit Singh',
+            size: null,
+            duration: '28:45',
+            description:
+              'Visual explanation of paging, segmentation, and virtual memory concepts.',
+            tags: [
+              'memory management',
+              'paging',
+              'segmentation',
+              'virtual memory',
+            ],
+            views: 1203,
+            rating: 4.5,
+            dateAdded: '2023-09-22',
+          },
+          {
+            id: '3',
+            title: 'Graph Algorithms Practice Quiz',
+            subject: 'Algorithms',
+            type: 'quiz',
+            author: 'GATE Prep Team',
+            size: null,
+            duration: '45 min',
+            description:
+              '25 questions covering BFS, DFS, shortest path, and minimum spanning trees.',
+            tags: ['graphs', 'algorithms', 'BFS', 'DFS', 'Dijkstra'],
+            attempts: 856,
+            rating: 4.8,
+            dateAdded: '2023-11-05',
+          },
+          {
+            id: '4',
+            title: 'TCP/IP Protocol Suite',
+            subject: 'Computer Networks',
+            type: 'pdf',
+            author: 'Prof. Neha Sharma',
+            size: '5.7 MB',
+            duration: null,
+            description:
+              'Detailed explanation of the TCP/IP protocol suite with diagrams and examples.',
+            tags: ['TCP/IP', 'networking', 'protocols'],
+            downloads: 512,
+            rating: 4.6,
+            dateAdded: '2023-08-30',
+          },
+          {
+            id: '5',
+            title: 'Database Normalization',
+            subject: 'Database Systems',
+            type: 'video',
+            author: 'Dr. Ramesh Kumar',
+            size: null,
+            duration: '42:18',
+            description:
+              'Step-by-step tutorial on normalization forms (1NF through BCNF) with examples.',
+            tags: ['database', 'normalization', 'SQL'],
+            views: 978,
+            rating: 4.9,
+            dateAdded: '2023-10-02',
+          },
+          {
+            id: '6',
+            title: 'Binary Trees Implementation',
+            subject: 'Data Structures',
+            type: 'notes',
+            author: 'Prof. Sunil Gupta',
+            size: '1.8 MB',
+            duration: null,
+            description:
+              'Hand-written notes covering binary tree operations, traversals, and implementations.',
+            tags: ['binary trees', 'data structures', 'traversals'],
+            downloads: 723,
+            rating: 4.5,
+            dateAdded: '2023-09-18',
+          },
+          {
+            id: '7',
+            title: 'Automata Theory Fundamentals',
+            subject: 'Theory of Computation',
+            type: 'pdf',
+            author: 'Dr. Kavitha Raman',
+            size: '4.1 MB',
+            duration: null,
+            description:
+              'Complete study material covering finite automata, regular expressions, and formal languages.',
+            tags: ['automata', 'formal languages', 'DFA', 'NFA'],
+            downloads: 631,
+            rating: 4.8,
+            dateAdded: '2023-11-12',
+          },
+          {
+            id: '8',
+            title: 'Digital Logic Design Quiz',
+            subject: 'Digital Logic',
+            type: 'quiz',
+            author: 'GATE Prep Team',
+            size: null,
+            duration: '30 min',
+            description:
+              '20 questions on boolean algebra, combinational and sequential circuits.',
+            tags: ['digital logic', 'boolean algebra', 'circuits'],
+            attempts: 542,
+            rating: 4.6,
+            dateAdded: '2023-10-25',
+          },
+          {
+            id: '9',
+            title: 'Probability and Statistics for CS',
+            subject: 'Mathematics',
+            type: 'video',
+            author: 'Prof. Anand Verma',
+            size: null,
+            duration: '53:20',
+            description:
+              'Key concepts of probability, random variables, and statistical inference for computer science.',
+            tags: ['probability', 'statistics', 'mathematics'],
+            views: 845,
+            rating: 4.7,
+            dateAdded: '2023-09-08',
+          },
+        ];
+        setResources(mockResources);
+        setFilteredResources(mockResources);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchResources();
+  }, [activeSubject, activeResourceType, searchQuery]);
+
+  // Fetch YouTube playlists
+  useEffect(() => {
+    const fetchPlaylists = async () => {
+      try {
+        setLoadingPlaylists(true);
+        const response = await api.youtube.getPlaylists();
+        setPlaylists(response.data);
+        setPlaylistError(null);
+      } catch (err) {
+        console.error('Error fetching playlists:', err);
+        setPlaylistError('Failed to load playlists');
+      } finally {
+        setLoadingPlaylists(false);
+      }
+    };
+
+    fetchPlaylists();
   }, []);
 
   // Filter resources based on selected subject, type, and search query
@@ -343,16 +430,85 @@ const ResourcesScreen = ({ navigation, route }) => {
         <Text style={[styles.sectionTitle, { color: theme.text }]}>
           Video Tutorials
         </Text>
-        <TouchableOpacity
-          style={[styles.resourceCard, { backgroundColor: theme.card }]}
-          onPress={() => navigation.navigate('YouTubePlaylist')}
-        >
-          <Icon name="youtube" size={24} color="red" />
-          <Text style={[styles.resourceText, { color: theme.text }]}>
-            Educational Playlists
-          </Text>
-          <Icon name="chevron-right" size={20} color={theme.text} />
-        </TouchableOpacity>
+
+        {loadingPlaylists ? (
+          <View style={styles.playlistLoading}>
+            <ActivityIndicator size="small" color={theme.primary} />
+            <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
+              Loading playlists...
+            </Text>
+          </View>
+        ) : playlistError ? (
+          <TouchableOpacity
+            style={[styles.resourceCard, { backgroundColor: theme.card }]}
+            onPress={() => navigation.navigate('YouTubePlaylist')}
+          >
+            <Icon name="youtube" size={24} color="red" />
+            <Text style={[styles.resourceText, { color: theme.text }]}>
+              Educational Playlists
+            </Text>
+            <Icon name="chevron-right" size={20} color={theme.text} />
+          </TouchableOpacity>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.playlistScroll}
+            contentContainerStyle={styles.playlistContainer}
+          >
+            {playlists.slice(0, 5).map(playlist => (
+              <TouchableOpacity
+                key={playlist.id}
+                style={[styles.playlistCard, { backgroundColor: theme.card }]}
+                onPress={() =>
+                  navigation.navigate('YouTubeVideoList', { playlist })
+                }
+              >
+                <Image
+                  source={{
+                    uri:
+                      playlist.thumbnailUrl ||
+                      require('../assets/images/playlist-placeholder.png'),
+                  }}
+                  style={styles.playlistThumbnail}
+                  resizeMode="cover"
+                />
+                <View style={styles.playlistInfo}>
+                  <Text
+                    style={[styles.playlistTitle, { color: theme.text }]}
+                    numberOfLines={2}
+                  >
+                    {playlist.title}
+                  </Text>
+                  <Text
+                    style={[styles.channelName, { color: theme.textSecondary }]}
+                    numberOfLines={1}
+                  >
+                    {playlist.channelName}
+                  </Text>
+                  <Text style={[styles.videoCount, { color: theme.primary }]}>
+                    {playlist._count?.videos || 0} videos
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            ))}
+
+            {playlists.length > 5 && (
+              <TouchableOpacity
+                style={[
+                  styles.seeMoreCard,
+                  { backgroundColor: `${theme.primary}20` },
+                ]}
+                onPress={() => navigation.navigate('YouTubePlaylist')}
+              >
+                <Icon name="dots-horizontal" size={24} color={theme.primary} />
+                <Text style={[styles.seeMoreText, { color: theme.primary }]}>
+                  See All Playlists
+                </Text>
+              </TouchableOpacity>
+            )}
+          </ScrollView>
+        )}
       </View>
 
       <View
@@ -488,37 +644,65 @@ const ResourcesScreen = ({ navigation, route }) => {
       </View>
       <View style={styles.resultsContainer}>
         <Text style={[styles.resultCount, { color: `${theme.text}80` }]}>
-          {filteredResources.length} resource
-          {filteredResources.length !== 1 ? 's' : ''} found
+          {loading
+            ? 'Loading resources...'
+            : `${filteredResources.length} resource(s) found`}
         </Text>
 
-        <FlatList
-          data={filteredResources}
-          keyExtractor={item => item.id}
-          renderItem={renderResourceItem}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.resourcesList}
-          ListEmptyComponent={() => (
-            <View style={styles.emptyState}>
-              <Icon name="file-search" size={64} color={`${theme.text}30`} />
-              <Text
-                style={[styles.emptyStateText, { color: `${theme.text}70` }]}
-              >
-                No resources match your search criteria
-              </Text>
-              <TouchableOpacity
-                style={[styles.resetButton, { backgroundColor: theme.primary }]}
-                onPress={() => {
-                  setActiveSubject('All');
-                  setActiveResourceType('All');
-                  setSearchQuery('');
-                }}
-              >
-                <Text style={styles.resetButtonText}>Reset Filters</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        />
+        {loading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.primary} />
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Icon name="alert-circle-outline" size={48} color="#E53935" />
+            <Text style={[styles.errorText, { color: theme.text }]}>
+              {error}
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: theme.primary }]}
+              onPress={() => {
+                setActiveSubject(initialSubject);
+                setActiveResourceType(initialType);
+                setSearchQuery('');
+                // This will trigger the useEffect to fetch resources again
+              }}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            data={filteredResources}
+            keyExtractor={item => item.id}
+            renderItem={renderResourceItem}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.resourcesList}
+            ListEmptyComponent={() => (
+              <View style={styles.emptyState}>
+                <Icon name="file-search" size={64} color={`${theme.text}30`} />
+                <Text
+                  style={[styles.emptyStateText, { color: `${theme.text}70` }]}
+                >
+                  No resources match your search criteria
+                </Text>
+                <TouchableOpacity
+                  style={[
+                    styles.resetButton,
+                    { backgroundColor: theme.primary },
+                  ]}
+                  onPress={() => {
+                    setActiveSubject('All');
+                    setActiveResourceType('All');
+                    setSearchQuery('');
+                  }}
+                >
+                  <Text style={styles.resetButtonText}>Reset Filters</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          />
+        )}
       </View>
       <TouchableOpacity
         style={[styles.fabButton, { backgroundColor: theme.primary }]}
@@ -759,6 +943,86 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
+    marginBottom: 16,
+  },
+  playlistLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+  },
+  loadingText: {
+    marginLeft: 8,
+    fontSize: 14,
+  },
+  playlistScroll: {
+    marginTop: 8,
+  },
+  playlistContainer: {
+    paddingRight: 16,
+  },
+  playlistCard: {
+    width: 180,
+    borderRadius: 8,
+    marginRight: 12,
+    overflow: 'hidden',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  playlistThumbnail: {
+    width: '100%',
+    height: 100,
+    backgroundColor: '#333',
+  },
+  playlistInfo: {
+    padding: 10,
+  },
+  playlistTitle: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+    height: 36, // Limit to 2 lines
+  },
+  channelName: {
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  videoCount: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  seeMoreCard: {
+    width: 120,
+    borderRadius: 8,
+    marginRight: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 10,
+  },
+  seeMoreText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 8,
+    textAlign: 'center',
   },
 });
 

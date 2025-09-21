@@ -14,21 +14,29 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeContext } from '../../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { useAuth } from '../../context/AuthContext';
 
 const LoginScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
+  const { login, loading, error } = useAuth();
+  
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
+
+  const validate = () => {
+    const errors = {};
+    if (!email.trim()) errors.email = 'Email is required';
+    if (!password.trim()) errors.password = 'Password is required';
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
 
   const handleLogin = async () => {
-    setLoading(true);
-    // Mock login - would connect to backend later
-    setTimeout(() => {
-      setLoading(false);
-      navigation.replace('Main');
-    }, 1500);
+    if (validate()) {
+      await login(email, password);
+    }
   };
 
   const styles = StyleSheet.create({
@@ -71,11 +79,17 @@ const LoginScreen = ({ navigation }) => {
       marginBottom: 8,
     },
     input: {
-      backgroundColor: `${theme.text}10`,
+      height: 50,
       borderRadius: 8,
-      padding: 16,
-      color: theme.text,
+      paddingHorizontal: 16,
       fontSize: 16,
+      borderWidth: 1,
+      borderColor: 'transparent',
+      backgroundColor: `${theme.text}10`,
+      color: theme.text,
+    },
+    inputError: {
+      borderColor: '#E53935',
     },
     passwordContainer: {
       flexDirection: 'row',
@@ -99,11 +113,12 @@ const LoginScreen = ({ navigation }) => {
       fontSize: 14,
     },
     loginButton: {
-      backgroundColor: theme.primary,
+      height: 50,
       borderRadius: 8,
-      padding: 16,
+      justifyContent: 'center',
       alignItems: 'center',
       marginTop: 24,
+      backgroundColor: theme.primary,
     },
     loginButtonText: {
       color: '#FFFFFF',
@@ -139,6 +154,17 @@ const LoginScreen = ({ navigation }) => {
       fontWeight: '500',
       marginLeft: 4,
     },
+    errorContainer: {
+      backgroundColor: '#FFEBEE',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 16,
+    },
+    errorText: {
+      color: '#E53935',
+      fontSize: 14,
+      marginTop: 4,
+    },
   });
 
   return (
@@ -169,7 +195,10 @@ const LoginScreen = ({ navigation }) => {
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Email</Text>
             <TextInput
-              style={styles.input}
+              style={[
+                styles.input,
+                validationErrors.email && styles.inputError,
+              ]}
               placeholder="Enter your email"
               placeholderTextColor={`${theme.text}50`}
               value={email}
@@ -177,13 +206,19 @@ const LoginScreen = ({ navigation }) => {
               keyboardType="email-address"
               autoCapitalize="none"
             />
+            {validationErrors.email && (
+              <Text style={styles.errorText}>{validationErrors.email}</Text>
+            )}
           </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Password</Text>
             <View style={styles.passwordContainer}>
               <TextInput
-                style={styles.passwordInput}
+                style={[
+                  styles.passwordInput,
+                  validationErrors.password && styles.inputError,
+                ]}
                 placeholder="Enter your password"
                 placeholderTextColor={`${theme.text}50`}
                 value={password}
@@ -205,6 +240,12 @@ const LoginScreen = ({ navigation }) => {
               <Text style={styles.forgotPassword}>Forgot Password?</Text>
             </TouchableOpacity>
           </View>
+
+          {error && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          )}
 
           <TouchableOpacity 
             style={styles.loginButton}
