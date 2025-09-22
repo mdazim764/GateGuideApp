@@ -59,32 +59,24 @@ const SubjectDetailScreen = ({ navigation, route }) => {
     }));
   };
 
-  // Toggle subtopic completion
+  // Update the toggleSubtopic function
   const toggleSubtopic = async subtopicId => {
     setLoadingSubtopics(prev => ({
       ...prev,
       [subtopicId]: true,
     }));
 
-    console.log('Toggling subtopic:', subtopicId);
-    console.log(
-      'Current completed status:',
-      completedSubtopics.has(subtopicId),
-    );
-
     try {
       // Check if the subtopic is currently completed
       const isCurrentlyCompleted = completedSubtopics.has(subtopicId);
+      const newStatus = isCurrentlyCompleted ? 'not_started' : 'completed';
 
-      // Call API to update progress - specify the new status
-      await api.progress.markSubtopicCompleted(
-        subtopicId,
-        isCurrentlyCompleted ? 'not_started' : 'completed',
-      );
+      console.log(`Toggling subtopic ${subtopicId} to ${newStatus}`);
 
-      console.log('API call successful');
+      // Call API to update progress
+      await api.progress.markSubtopicCompleted(subtopicId, newStatus);
 
-      // Update local state
+      // Update local state immediately for better UX
       setCompletedSubtopics(prev => {
         const newSet = new Set(prev);
         if (isCurrentlyCompleted) {
@@ -102,6 +94,45 @@ const SubjectDetailScreen = ({ navigation, route }) => {
         ...prev,
         [subtopicId]: false,
       }));
+    }
+  };
+
+  // Refresh subject data from the server
+  const refreshSubjectData = async () => {
+    try {
+      // Get the latest subject data with progress information
+      const response = await api.academic.getSubjectDetail(subject.id);
+      if (response.data) {
+        // Update local set of completed subtopics
+        const completedSet = new Set();
+
+        // Process all units, topics, and subtopics
+        if (response.data.units) {
+          response.data.units.forEach(unit => {
+            if (unit.topics) {
+              unit.topics.forEach(topic => {
+                if (topic.subtopics) {
+                  topic.subtopics.forEach(subtopic => {
+                    // Add to set if completed - checking all possible ways it might be marked
+                    if (
+                      subtopic.status === 'completed' ||
+                      subtopic.progress === 'completed' ||
+                      subtopic.progress === 100
+                    ) {
+                      completedSet.add(subtopic.id);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+
+        // Update the state with fresh data
+        setCompletedSubtopics(completedSet);
+      }
+    } catch (error) {
+      console.error('Error refreshing subject data:', error);
     }
   };
 
@@ -204,7 +235,11 @@ const SubjectDetailScreen = ({ navigation, route }) => {
         {isExpanded && item.subtopics && item.subtopics.length > 0 && (
           <View style={styles.subtopicsContainer}>
             {item.subtopics.map(subtopic => {
-              const isCompleted = completedSubtopics.has(subtopic.id);
+              const isCompleted =
+                completedSubtopics.has(subtopic.id) ||
+                subtopic.status === 'completed' ||
+                subtopic.progress === 'completed' ||
+                subtopic.progress === 100;
               const isLoading = loadingSubtopics[subtopic.id];
 
               return (
@@ -267,6 +302,20 @@ const SubjectDetailScreen = ({ navigation, route }) => {
   const averageProgress =
     sectionData.reduce((sum, unit) => sum + unit.progress, 0) /
     (sectionData.length || 1);
+
+  React.useEffect(() => {
+    // Initial data load
+    refreshSubjectData();
+
+    // Set up a listener for when screen comes into focus
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('SubjectDetailScreen focused, refreshing data...');
+      refreshSubjectData();
+    });
+
+    // Clean up the listener when component unmounts
+    return unsubscribe;
+  }, [navigation, subject.id]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
