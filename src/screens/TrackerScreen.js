@@ -25,69 +25,6 @@ const TABS = [
   { key: 'analytics', label: 'Analytics' },
 ];
 
-// TrackerScreen API Integration
-const fetchSubjectData = async subjectId => {
-  try {
-    const response = await api.academic.getSubjectDetail(subjectId);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching subject data:', error);
-    return null;
-  }
-};
-
-const fetchTopicProgress = async topicId => {
-  try {
-    const response = await api.progress.getTopicProgress(topicId);
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching topic progress:', error);
-    return { completed: [], total: 0 };
-  }
-};
-
-// Update the fetchAnalytics function
-const fetchAnalytics = async () => {
-  try {
-    // Replace with the correct API endpoint
-    // If getAnalytics doesn't exist, use getSummary which does exist
-    const response = await api.dashboard.getSummary();
-
-    // Transform the data to the format needed by the analytics tab
-    return {
-      daily: {
-        topics: response.data.dailyTopicsCompleted || 0,
-        pyqs: response.data.dailyPyqsAttempted || 0,
-        quizzes: response.data.dailyQuizzesTaken || 0,
-      },
-      weekly: {
-        topics: response.data.weeklyTopicsCompleted || 0,
-        pyqs: response.data.weeklyPyqsAttempted || 0,
-        quizzes: response.data.weeklyQuizzesTaken || 0,
-      },
-      monthly: {
-        topics: response.data.monthlyTopicsCompleted || 0,
-        pyqs: response.data.monthlyPyqsAttempted || 0,
-        quizzes: response.data.monthlyQuizzesTaken || 0,
-      },
-      strengths: response.data.strengths || [],
-      weaknesses: response.data.weaknesses || [],
-      improvement: response.data.improvement || [],
-    };
-  } catch (error) {
-    console.error('Error fetching analytics:', error);
-    // Return fallback mock data
-    return {
-      daily: { topics: 0, pyqs: 0, quizzes: 0 },
-      weekly: { topics: 0, pyqs: 0, quizzes: 0 },
-      monthly: { topics: 0, pyqs: 0, quizzes: 0 },
-      strengths: [],
-      weaknesses: [],
-      improvement: [],
-    };
-  }
-};
-
 const TrackerScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
   const { progress, updateProgress } = useApp();
@@ -123,6 +60,7 @@ const TrackerScreen = ({ navigation, route }) => {
   const [selectedYear, setSelectedYear] = useState(null);
   const [pyqQuestions, setPyqQuestions] = useState([]);
   const [subjectsData, setSubjectsData] = useState([]);
+  const [dashboardData, setDashboardData] = useState(null);
   // --- Progress Calculations ---
   const calculateProgress = () => {
     let totalTopics = 0;
@@ -165,27 +103,35 @@ const TrackerScreen = ({ navigation, route }) => {
   });
   const [quizzes, setQuizzes] = useState([]);
 
-  // Update the calculateSubjectProgressFromData function to match how backend calculates progress
   const calculateSubjectProgressFromData = subject => {
     if (!subject || !subject.units) {
       return { percentage: 0, completed: 0, total: 0 };
     }
 
+    // Calculate totals from topics that have API-provided progress values
+    let totalTopics = 0;
+    let completedTopicsValue = 0;
     let totalSubtopics = 0;
     let completedSubtopics = 0;
 
-    // Iterate through the 4-layer structure
     subject.units.forEach(unit => {
       if (unit.topics) {
         unit.topics.forEach(topic => {
           if (topic.subtopics && topic.subtopics.length > 0) {
-            // Count all subtopics
             totalSubtopics += topic.subtopics.length;
-
-            // Count completed subtopics
-            completedSubtopics += topic.subtopics.filter(
-              st => st.status === 'completed',
-            ).length;
+            // Use completedCount provided by API if available
+            if (topic.completedCount !== undefined) {
+              completedSubtopics += topic.completedCount;
+            } else {
+              completedSubtopics += topic.subtopics.filter(
+                st => st.status === 'completed',
+              ).length;
+            }
+            // Also track topic-level completion
+            totalTopics++;
+            if (topic.progress === 100) {
+              completedTopicsValue++;
+            }
           }
         });
       }
@@ -201,26 +147,31 @@ const TrackerScreen = ({ navigation, route }) => {
       percentage,
       completed: completedSubtopics,
       total: totalSubtopics,
+      completedTopics: completedTopicsValue,
+      totalTopics: totalTopics,
     };
   };
 
-  // FIXED: Move calculateTopicProgress outside of other functions
+  // Change calculateTopicProgress to use the API-provided progress
   const calculateTopicProgress = topic => {
+    // Use the progress value directly provided by the API
+    if (topic && topic.progress !== undefined) {
+      return topic.progress;
+    }
+
+    // Fallback calculation only if API doesn't provide progress
     if (!topic || !topic.subtopics || topic.subtopics.length === 0) {
       return 0;
     }
 
-    // Count completed subtopics using the status field
     const completedCount = topic.subtopics.filter(
-      st => st.status === 'completed',
+      st => st.status === 'completed' || completedSubtopics.has(st.id),
     ).length;
 
     return Math.round((completedCount / topic.subtopics.length) * 100);
   };
 
-  // MOVE toggleSubtopicStatus outside to component level
   const toggleSubtopicStatus = async subtopicId => {
-    // Set loading state
     setLoading(prev => ({ ...prev, [subtopicId]: true }));
 
     try {
@@ -228,37 +179,35 @@ const TrackerScreen = ({ navigation, route }) => {
       const subtopic = selectedTopic.subtopics.find(s => s.id === subtopicId);
       if (!subtopic) return;
 
-      // Determine current completion status
+      // Determine current completion status - using API response data
       const isCurrentlyCompleted = subtopic.status === 'completed';
       const newStatus = isCurrentlyCompleted ? 'not_started' : 'completed';
 
-      // Call API to update progress - specify the new status
-      await api.progress.markSubtopicCompleted(
-        subtopicId,
-        isCurrentlyCompleted ? 'not_started' : 'completed',
-      );
-
-      console.log('API call successful');
-
       console.log(`Updating subtopic ${subtopicId} to ${newStatus}...`);
 
-      // Make the API call
+      // Update API
       await api.progress.markSubtopicCompleted(subtopicId, newStatus);
 
       console.log(
         `Successfully updated subtopic ${subtopicId} to ${newStatus}`,
       );
 
-      // Update local state immediately for better user experience
+      // Update local subtopic state immediately for better UX
       setSelectedTopic(prevTopic => ({
         ...prevTopic,
         subtopics: prevTopic.subtopics.map(s =>
-          s.id === subtopicId
-            ? {
-                ...s,
-                status: newStatus,
-              }
-            : s,
+          s.id === subtopicId ? { ...s, status: newStatus } : s,
+        ),
+        // Also update topic's progress and completedCount
+        completedCount: isCurrentlyCompleted
+          ? prevTopic.completedCount - 1
+          : prevTopic.completedCount + 1,
+        progress: Math.round(
+          ((isCurrentlyCompleted
+            ? prevTopic.completedCount - 1
+            : prevTopic.completedCount + 1) /
+            prevTopic.subtopics.length) *
+            100,
         ),
       }));
 
@@ -273,39 +222,10 @@ const TrackerScreen = ({ navigation, route }) => {
         return newSet;
       });
 
-      // Instead of reloading all data, just update the specific subject data
-      if (selectedSubject) {
-        try {
-          const response = await api.academic.getSubjectDetail(
-            selectedSubject.id,
-          );
-          if (response && response.data) {
-            // Update selected subject with fresh data
-            setSelectedSubject(response.data);
-
-            // Find and update the current topic with fresh data
-            if (selectedTopic) {
-              const updatedUnit = response.data.units.find(u =>
-                u.topics.some(t => t.id === selectedTopic.id),
-              );
-
-              if (updatedUnit) {
-                const updatedTopic = updatedUnit.topics.find(
-                  t => t.id === selectedTopic.id,
-                );
-
-                if (updatedTopic) {
-                  // Use the updated topic data but preserve the loading state
-                  setSelectedTopic(updatedTopic);
-                }
-              }
-            }
-          }
-        } catch (subjectError) {
-          console.log('Error refreshing subject data:', subjectError);
-          // Continue with local state updates even if refresh fails
-        }
-      }
+      // Refresh all data to ensure consistency
+      setTimeout(() => {
+        loadData();
+      }, 500); // Small delay to ensure API has processed the update
     } catch (error) {
       console.error('Error updating subtopic progress:', error);
       Alert.alert(
@@ -313,7 +233,6 @@ const TrackerScreen = ({ navigation, route }) => {
         'Failed to update subtopic progress. Please try again.',
       );
     } finally {
-      // Clear loading state
       setLoading(prev => ({ ...prev, [subtopicId]: false }));
     }
   };
@@ -334,22 +253,61 @@ const TrackerScreen = ({ navigation, route }) => {
     }
   }, [selectedSubjectId]);
 
-  // If a topic ID was provided, scroll to it or highlight it
   React.useEffect(() => {
-    if (selectedSubjectId && selectedTopicId) {
-      // Future implementation: scroll to specific topic
+    if (selectedTopic && selectedTopic.subtopics) {
+      // Update completedSubtopics based on the current topic's subtopics
+      const topicCompletedSubtopics = new Set();
+
+      selectedTopic.subtopics.forEach(subtopic => {
+        if (subtopic.status === 'completed' || subtopic.completed) {
+          topicCompletedSubtopics.add(subtopic.id);
+        }
+      });
+
+      // Update the completedSubtopics set with these completed subtopics
+      setCompletedSubtopics(prev => {
+        const newSet = new Set(prev);
+        topicCompletedSubtopics.forEach(id => newSet.add(id));
+        return newSet;
+      });
     }
-  }, [selectedSubjectId, selectedTopicId]);
+  }, [selectedTopic]);
+
+  React.useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      console.log('Screen focused, refreshing data');
+      loadData();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   // Call this in a useEffect
   React.useEffect(() => {
     loadData();
   }, [selectedTab]);
 
-  // 2. Add a function to update the completedSubtopics set based on fetched data
+  React.useEffect(() => {
+    // This runs whenever subjectsData changes (API data refreshes)
+    if (subjectsData.length > 0) {
+      updateCompletedSubtopicsFromData(subjectsData);
+
+      // If we have a selected subject, make sure its data is fresh
+      if (selectedSubject) {
+        const freshSubject = subjectsData.find(
+          s => s.id === selectedSubject.id,
+        );
+        if (freshSubject) {
+          setSelectedSubject(freshSubject);
+        }
+      }
+    }
+  }, [subjectsData]);
+
   const updateCompletedSubtopicsFromData = data => {
     const completedSet = new Set();
 
+    // Process the whole syllabus structure to find completed subtopics
     if (data && data.length > 0) {
       data.forEach(subject => {
         if (subject.units) {
@@ -358,6 +316,7 @@ const TrackerScreen = ({ navigation, route }) => {
               unit.topics.forEach(topic => {
                 if (topic.subtopics) {
                   topic.subtopics.forEach(subtopic => {
+                    // Mark as completed if status is 'completed'
                     if (subtopic.status === 'completed') {
                       completedSet.add(subtopic.id);
                     }
@@ -370,6 +329,7 @@ const TrackerScreen = ({ navigation, route }) => {
       });
     }
 
+    console.log(`Found ${completedSet.size} completed subtopics from API data`);
     setCompletedSubtopics(completedSet);
   };
 
@@ -378,35 +338,43 @@ const TrackerScreen = ({ navigation, route }) => {
     if (selectedTab === 'syllabus') {
       setIsLoading(prev => ({ ...prev, subjects: true }));
       try {
-        // Use the real API endpoint for syllabus with progress
+        // Fetch dashboard summary data
+        const summaryResponse = await api.dashboard.getSummary();
+        setDashboardData(summaryResponse.data);
+        // Get syllabus with progress data from API
         const response = await api.academic.getSyllabusWithProgress();
         console.log('Syllabus data fetched:', response.data);
 
         if (response.data) {
+          // Update the main syllabus data
           setSubjectsData(response.data);
-          // Update the completed subtopics set
+
+          // Also update the completedSubtopics Set
           updateCompletedSubtopicsFromData(response.data);
 
-          // If a subject is selected, update its data too
+          // If we have a selected subject, get fresh details for it
           if (selectedSubject) {
-            const subjectDetail = await api.academic.getSubjectDetail(
-              selectedSubject.id,
+            const freshSubject = response.data.find(
+              s => s.id === selectedSubject.id,
             );
-            if (subjectDetail.data) {
-              setSelectedSubject(subjectDetail.data);
+            if (freshSubject) {
+              setSelectedSubject(freshSubject);
 
-              // If a topic is selected, find and update it
+              // If we have a selected topic, find it in the fresh data
               if (selectedTopic) {
-                const foundUnit = subjectDetail.data.units.find(u =>
-                  u.topics.some(t => t.id === selectedTopic.id),
-                );
-                if (foundUnit) {
-                  const foundTopic = foundUnit.topics.find(
+                let foundTopic = null;
+
+                // Look for the topic in the fresh subject data
+                freshSubject.units.forEach(unit => {
+                  const topic = unit.topics.find(
                     t => t.id === selectedTopic.id,
                   );
-                  if (foundTopic) {
-                    setSelectedTopic(foundTopic);
-                  }
+                  if (topic) foundTopic = topic;
+                });
+
+                // Update the selected topic with fresh data if found
+                if (foundTopic) {
+                  setSelectedTopic(foundTopic);
                 }
               }
             }
@@ -587,7 +555,6 @@ const TrackerScreen = ({ navigation, route }) => {
           navigation={navigation}
           onBack={() => setSelectedTopic(null)}
         />
-
         {/* Overall topic progress */}
         <View
           style={[
@@ -615,22 +582,16 @@ const TrackerScreen = ({ navigation, route }) => {
             />
           </View>
           <Text style={[styles.overallText, { color: theme.text }]}>
-            {
-              selectedTopic.subtopics.filter(
-                st => st.completed || st.status === 'completed',
-              ).length
-            }
-            /{selectedTopic.subtopics.length} subtopics completed
+            {(selectedTopic?.progress / 100) * selectedTopic?.subtopics.length}/
+            {selectedTopic.subtopics.length} subtopics completed
           </Text>
         </View>
-
+        // In the FlatList renderItem for subtopics
         <FlatList
           data={selectedTopic.subtopics}
           keyExtractor={item => item.id}
           renderItem={({ item: subtopic }) => {
-            const isCompleted =
-              completedSubtopics.has(subtopic.id) ||
-              subtopic.status === 'completed';
+            const isCompleted = subtopic?.progress === 'completed';
 
             return (
               <TouchableOpacity
@@ -683,14 +644,6 @@ const TrackerScreen = ({ navigation, route }) => {
               </TouchableOpacity>
             );
           }}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Icon name="book-outline" size={64} color={`${theme.text}20`} />
-              <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
-                No subtopics found for this topic
-              </Text>
-            </View>
-          }
         />
       </SafeAreaView>
     );
@@ -763,18 +716,14 @@ const TrackerScreen = ({ navigation, route }) => {
                 style={[
                   styles.progressBar,
                   {
-                    width: `${
-                      calculateSubjectProgressFromData(selectedSubject)
-                        .percentage
-                    }%`,
+                    width: `${selectedSubject?.progress}%`,
                     backgroundColor: theme.primary,
                   },
                 ]}
               />
             </View>
             <Text style={[styles.overallText, { color: theme.text }]}>
-              {calculateSubjectProgressFromData(selectedSubject).percentage}%
-              Complete
+              {selectedSubject?.progress}% Complete
             </Text>
           </View>
 
@@ -861,9 +810,11 @@ const TrackerScreen = ({ navigation, route }) => {
                         >
                           {topic.subtopics
                             ? `${
-                                topic.subtopics.filter(
-                                  st => st.status === 'completed',
-                                ).length
+                                // topic.subtopics.filter(
+                                //   st => st.status === 'completed',
+                                // ).length
+                                (topic?.progress / 100) *
+                                topic?.subtopics.length
                               }/${topic.subtopics.length} subtopics`
                             : 'No subtopics'}
                         </Text>
@@ -1314,16 +1265,16 @@ const TrackerScreen = ({ navigation, route }) => {
                   style={[
                     styles.progressBar,
                     {
-                      width: `${calculateProgress().percentage}%`,
+                      width: `${dashboardData?.overallProgress}%`,
                       backgroundColor: theme.primary,
                     },
                   ]}
                 />
               </View>
               <Text style={[styles.overallText, { color: theme.text }]}>
-                {calculateProgress().percentage}% -{' '}
-                {calculateProgress().completed}/{calculateProgress().total}{' '}
-                topics completed
+                {dashboardData?.overallProgress}% -{' '}
+                {dashboardData?.completedSubtopics}/
+                {dashboardData?.totalSubtopics} topics completed
               </Text>
             </View>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>
