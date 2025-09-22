@@ -117,13 +117,13 @@ const TrackerScreen = ({ navigation, route }) => {
   const [selectedYear, setSelectedYear] = useState(null);
   const [pyqQuestions, setPyqQuestions] = useState([]);
   const [subjectsData, setSubjectsData] = useState([]);
-
+  
   // MOVE ALL STATE DEFINITIONS HERE
   const [analytics, setAnalytics] = useState({
     daily: { topics: 0, pyqs: 0, quizzes: 0 },
     weekly: { topics: 0, pyqs: 0, quizzes: 0 },
     monthly: { topics: 0, pyqs: 0, quizzes: 0 },
-    // overall: calculateProgress(),
+    overall: calculateProgress(),
     strengths: [],
     weaknesses: [],
     improvement: [],
@@ -199,7 +199,7 @@ const TrackerScreen = ({ navigation, route }) => {
     };
   };
 
-  // Update the calculateTopicProgress function to use status property
+  // FIXED: Move calculateTopicProgress outside of other functions
   const calculateTopicProgress = topic => {
     if (!topic || !topic.subtopics || topic.subtopics.length === 0) {
       return 0;
@@ -213,8 +213,7 @@ const TrackerScreen = ({ navigation, route }) => {
     return Math.round((completedCount / topic.subtopics.length) * 100);
   };
 
-  // Update the toggleSubtopicStatus function to match SubjectDetailScreen
-
+  // MOVE toggleSubtopicStatus outside to component level
   const toggleSubtopicStatus = async subtopicId => {
     // Set loading state
     setLoading(prev => ({ ...prev, [subtopicId]: true }));
@@ -298,6 +297,33 @@ const TrackerScreen = ({ navigation, route }) => {
     loadData();
   }, [selectedTab]);
 
+  // 2. Add a function to update the completedSubtopics set based on fetched data
+  const updateCompletedSubtopicsFromData = data => {
+    const completedSet = new Set();
+
+    if (data && data.length > 0) {
+      data.forEach(subject => {
+        if (subject.units) {
+          subject.units.forEach(unit => {
+            if (unit.topics) {
+              unit.topics.forEach(topic => {
+                if (topic.subtopics) {
+                  topic.subtopics.forEach(subtopic => {
+                    if (subtopic.status === 'completed') {
+                      completedSet.add(subtopic.id);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+
+    setCompletedSubtopics(completedSet);
+  };
+
   // Add a loadData function
   const loadData = async () => {
     if (selectedTab === 'syllabus') {
@@ -309,6 +335,8 @@ const TrackerScreen = ({ navigation, route }) => {
 
         if (response.data) {
           setSubjectsData(response.data);
+          // Update the completed subtopics set
+          updateCompletedSubtopicsFromData(response.data);
 
           // If a subject is selected, update its data too
           if (selectedSubject) {
@@ -318,7 +346,7 @@ const TrackerScreen = ({ navigation, route }) => {
             if (subjectDetail.data) {
               setSelectedSubject(subjectDetail.data);
 
-              // If a topic is selected, update it as well
+              // If a topic is selected, find and update it
               if (selectedTopic) {
                 const foundUnit = subjectDetail.data.units.find(u =>
                   u.topics.some(t => t.id === selectedTopic.id),
@@ -337,7 +365,6 @@ const TrackerScreen = ({ navigation, route }) => {
         }
       } catch (err) {
         console.error('Error loading syllabus data:', err);
-        // Show error message to user
         Alert.alert(
           'Failed to Load',
           'Could not load syllabus data. Please check your connection and try again.',
@@ -551,60 +578,62 @@ const TrackerScreen = ({ navigation, route }) => {
         <FlatList
           data={selectedTopic.subtopics}
           keyExtractor={item => item.id}
-          renderItem={({ item: subtopic }) => (
-            <TouchableOpacity
-              style={[
-                styles.subtopicItem,
-                {
-                  backgroundColor: theme.card,
-                  padding: 16,
-                  borderRadius: 8,
-                  marginHorizontal: 16,
-                  marginBottom: 8,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  borderLeftWidth: 4,
-                  borderLeftColor:
-                    subtopic.status === 'completed'
+          renderItem={({ item: subtopic }) => {
+            const isCompleted =
+              completedSubtopics.has(subtopic.id) ||
+              subtopic.status === 'completed';
+
+            return (
+              <TouchableOpacity
+                style={[
+                  styles.subtopicItem,
+                  {
+                    backgroundColor: theme.card,
+                    padding: 16,
+                    borderRadius: 8,
+                    marginHorizontal: 16,
+                    marginBottom: 8,
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderLeftWidth: 4,
+                    borderLeftColor: isCompleted
                       ? theme.primary
                       : 'transparent',
-                },
-              ]}
-              onPress={() => toggleSubtopicStatus(subtopic.id)}
-            >
-              <Text
-                style={[
-                  styles.subtopicName,
-                  {
-                    color: theme.text,
-                    flex: 1,
-                    textDecorationLine:
-                      subtopic.status === 'completed' ? 'line-through' : 'none',
-                    opacity: subtopic.status === 'completed' ? 0.7 : 1,
                   },
                 ]}
+                onPress={() => toggleSubtopicStatus(subtopic.id)}
               >
-                {subtopic.name}
-              </Text>
+                <Text
+                  style={[
+                    styles.subtopicName,
+                    {
+                      color: theme.text,
+                      flex: 1,
+                      textDecorationLine: isCompleted ? 'line-through' : 'none',
+                      opacity: isCompleted ? 0.7 : 1,
+                    },
+                  ]}
+                >
+                  {subtopic.name}
+                </Text>
 
-              {loading[subtopic.id] ? (
-                <ActivityIndicator size="small" color={theme.primary} />
-              ) : (
-                <Icon
-                  name={
-                    subtopic.status === 'completed'
-                      ? 'checkbox-marked-circle'
-                      : 'checkbox-blank-circle-outline'
-                  }
-                  size={24}
-                  color={
-                    subtopic.status === 'completed' ? theme.primary : theme.text
-                  }
-                />
-              )}
-            </TouchableOpacity>
-          )}
+                {loading[subtopic.id] ? (
+                  <ActivityIndicator size="small" color={theme.primary} />
+                ) : (
+                  <Icon
+                    name={
+                      isCompleted
+                        ? 'checkbox-marked-circle'
+                        : 'checkbox-blank-circle-outline'
+                    }
+                    size={24}
+                    color={isCompleted ? theme.primary : theme.text}
+                  />
+                )}
+              </TouchableOpacity>
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Icon name="book-outline" size={64} color={`${theme.text}20`} />
