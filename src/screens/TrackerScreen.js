@@ -108,7 +108,13 @@ const TrackerScreen = ({ navigation, route }) => {
     pyqs: false,
     pyqQuestions: false,
   });
-  const [completedSubtopics, setCompletedSubtopics] = useState(new Set());
+  const [completedSubtopics, setCompletedSubtopics] = useState(() => {
+    // Create a set of all completed subtopic IDs by scanning through the data
+    const completedSet = new Set();
+
+    // We'll populate this when data is loaded - initially empty
+    return completedSet;
+  });
   const [loading, setLoading] = useState({});
   const [selectedTab, setSelectedTab] = useState(initialTab);
   const [selectedTopic, setSelectedTopic] = useState(null);
@@ -117,26 +123,6 @@ const TrackerScreen = ({ navigation, route }) => {
   const [selectedYear, setSelectedYear] = useState(null);
   const [pyqQuestions, setPyqQuestions] = useState([]);
   const [subjectsData, setSubjectsData] = useState([]);
-  
-  // MOVE ALL STATE DEFINITIONS HERE
-  const [analytics, setAnalytics] = useState({
-    daily: { topics: 0, pyqs: 0, quizzes: 0 },
-    weekly: { topics: 0, pyqs: 0, quizzes: 0 },
-    monthly: { topics: 0, pyqs: 0, quizzes: 0 },
-    overall: calculateProgress(),
-    strengths: [],
-    weaknesses: [],
-    improvement: [],
-  });
-
-  const [pyqStats, setPyqStats] = useState({
-    attempted: 0,
-    correct: 0,
-    incorrect: 0,
-    subjects: [],
-  });
-  const [quizzes, setQuizzes] = useState([]);
-
   // --- Progress Calculations ---
   const calculateProgress = () => {
     let totalTopics = 0;
@@ -159,6 +145,25 @@ const TrackerScreen = ({ navigation, route }) => {
       total: totalTopics,
     };
   };
+
+  // MOVE ALL STATE DEFINITIONS HERE
+  const [analytics, setAnalytics] = useState({
+    daily: { topics: 0, pyqs: 0, quizzes: 0 },
+    weekly: { topics: 0, pyqs: 0, quizzes: 0 },
+    monthly: { topics: 0, pyqs: 0, quizzes: 0 },
+    overall: calculateProgress(),
+    strengths: [],
+    weaknesses: [],
+    improvement: [],
+  });
+
+  const [pyqStats, setPyqStats] = useState({
+    attempted: 0,
+    correct: 0,
+    incorrect: 0,
+    subjects: [],
+  });
+  const [quizzes, setQuizzes] = useState([]);
 
   // Update the calculateSubjectProgressFromData function to match how backend calculates progress
   const calculateSubjectProgressFromData = subject => {
@@ -227,11 +232,24 @@ const TrackerScreen = ({ navigation, route }) => {
       const isCurrentlyCompleted = subtopic.status === 'completed';
       const newStatus = isCurrentlyCompleted ? 'not_started' : 'completed';
 
-      // Use the correct API call as in SubjectDetailScreen
-      await api.progress.markSubtopicCompleted(subtopicId, newStatus);
-      console.log(`Updated subtopic ${subtopicId} to ${newStatus}`);
+      // Call API to update progress - specify the new status
+      await api.progress.markSubtopicCompleted(
+        subtopicId,
+        isCurrentlyCompleted ? 'not_started' : 'completed',
+      );
 
-      // Update local state
+      console.log('API call successful');
+
+      console.log(`Updating subtopic ${subtopicId} to ${newStatus}...`);
+
+      // Make the API call
+      await api.progress.markSubtopicCompleted(subtopicId, newStatus);
+
+      console.log(
+        `Successfully updated subtopic ${subtopicId} to ${newStatus}`,
+      );
+
+      // Update local state immediately for better user experience
       setSelectedTopic(prevTopic => ({
         ...prevTopic,
         subtopics: prevTopic.subtopics.map(s =>
@@ -244,27 +262,58 @@ const TrackerScreen = ({ navigation, route }) => {
         ),
       }));
 
-      // Reload subject data to reflect updated progress at all levels
+      // Update completedSubtopics set
+      setCompletedSubtopics(prev => {
+        const newSet = new Set(prev);
+        if (isCurrentlyCompleted) {
+          newSet.delete(subtopicId);
+        } else {
+          newSet.add(subtopicId);
+        }
+        return newSet;
+      });
+
+      // Instead of reloading all data, just update the specific subject data
       if (selectedSubject) {
-        const updatedSubjectData = await api.academic.getSubjectDetail(
-          selectedSubject.id,
-        );
-        if (updatedSubjectData.data) {
-          const updatedSubject = updatedSubjectData.data;
-          // Update the subject in the subjectsData array
-          setSubjectsData(prevData =>
-            prevData.map(s =>
-              s.id === selectedSubject.id ? updatedSubject : s,
-            ),
+        try {
+          const response = await api.academic.getSubjectDetail(
+            selectedSubject.id,
           );
-          // Update the selected subject
-          setSelectedSubject(updatedSubject);
+          if (response && response.data) {
+            // Update selected subject with fresh data
+            setSelectedSubject(response.data);
+
+            // Find and update the current topic with fresh data
+            if (selectedTopic) {
+              const updatedUnit = response.data.units.find(u =>
+                u.topics.some(t => t.id === selectedTopic.id),
+              );
+
+              if (updatedUnit) {
+                const updatedTopic = updatedUnit.topics.find(
+                  t => t.id === selectedTopic.id,
+                );
+
+                if (updatedTopic) {
+                  // Use the updated topic data but preserve the loading state
+                  setSelectedTopic(updatedTopic);
+                }
+              }
+            }
+          }
+        } catch (subjectError) {
+          console.log('Error refreshing subject data:', subjectError);
+          // Continue with local state updates even if refresh fails
         }
       }
     } catch (error) {
       console.error('Error updating subtopic progress:', error);
-      Alert.alert('Error', 'Failed to update subtopic progress');
+      Alert.alert(
+        'Error',
+        'Failed to update subtopic progress. Please try again.',
+      );
     } finally {
+      // Clear loading state
       setLoading(prev => ({ ...prev, [subtopicId]: false }));
     }
   };
