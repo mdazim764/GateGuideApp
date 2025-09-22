@@ -209,9 +209,13 @@ const api = {
         subtopicId,
         status,
       }),
-
+    updateTopicProgress: (topicId, completed) =>
+      apiClient.post(`/progress/topic`, { topicId, completed }),
+    updateSubtopicProgress: (subtopicId, completed) =>
+      apiClient.post(`/progress/subtopic`, { subtopicId, completed }),
     // Get all user progress
     getAllProgress: () => apiClient.get('/progress'),
+    getTopicProgress: topicId => apiClient.get(`/progress/topic/${topicId}`),
   },
 
   ai: {
@@ -233,6 +237,11 @@ const api = {
   pyqs: {
     getAll: filters => apiClient.get('/pyqs', { params: filters }),
     getById: id => apiClient.get(`/pyqs/${id}`),
+    getAllPyqStats: () => apiClient.get('/pyq/stats'),
+    getPyqQuestionsBySubject: subjectId =>
+      apiClient.get(`/pyq/questions/subject/${subjectId}`),
+    getPyqQuestionsBySubjectAndYear: (subjectId, year) =>
+      apiClient.get(`/pyq/questions/subject/${subjectId}/year/${year}`),
   },
 
   quizzes: {
@@ -264,7 +273,7 @@ const api = {
   youtube: {
     getPlaylists: () => apiClient.get('/youtube/playlists'),
     // Fix 1: Make sure this URL matches your backend route exactly
-    getPlaylistVideos: (playlistId) => 
+    getPlaylistVideos: playlistId =>
       apiClient.get(`/youtube/playlists/${playlistId}/videos`),
     addPlaylist: playlistData =>
       apiClient.post('/youtube/playlists/add', playlistData),
