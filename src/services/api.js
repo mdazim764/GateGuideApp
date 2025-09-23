@@ -282,37 +282,47 @@ const api = {
   },
 
   planner: {
-    // Get all tasks
-    getAllTasks: () => apiClient.get('/planner/alltasks'),
-
-    // Get tasks for a specific date
-    getTasksByDate: date =>
-      apiClient.get(`/planner/tasks`, { params: { date } }),
-
-    // Get tasks between date range
-    getEvents: (startDate, endDate) =>
-      apiClient.get('/planner/events', { params: { startDate, endDate } }),
-
-    // Create new task/event
-    createTask: taskData => apiClient.post('/planner/tasks', taskData),
-    createEvent: eventData => apiClient.post('/planner/events', eventData),
-
-    // Update task/event
-    updateTask: (id, taskData) =>
-      apiClient.put(`/planner/tasks/${id}`, taskData),
-    updateEvent: (id, eventData) =>
-      apiClient.put(`/planner/events/${id}`, eventData),
-
-    // Delete task/event
-    deleteTask: id => apiClient.delete(`/planner/tasks/${id}`),
-    deleteEvent: id => apiClient.delete(`/planner/events/${id}`),
+    // Get tasks for a specific day
+    getTasksByDate: (date) => 
+      apiClient.get(`/planner/tasks?date=${date}`),
+    
+    // Get all tasks (useful for calendar marking)
+    getAllTasks: () => 
+      apiClient.get('/planner/alltasks'),
+    
+    // Add a new task
+    createTask: (taskData) => 
+      apiClient.post('/planner/tasks', taskData),
+    
+    // Update a task
+    updateTask: (taskId, updateData) => 
+      apiClient.put(`/planner/tasks/${taskId}`, updateData),
+    
+    // Delete a task
+    deleteTask: (taskId) => 
+      apiClient.delete(`/planner/tasks/${taskId}`),
   },
 
   session: {
-    start: data => apiClient.post('/session/start', data),
-    end: (id, data) => apiClient.put(`/session/${id}/end`, data),
-    getAll: () => apiClient.get('/session/all'),
-    log: sessionData => apiClient.post('/sessions/log', sessionData),
+    // Log a new study session
+    logSession: data => apiClient.post('/sessions/log', data),
+    
+    // Get today's study statistics
+    getTodaysStats: () => apiClient.get('/sessions/today'),
+    
+    // Get session history with pagination and filtering
+    getSessionHistory: (params = {}) => 
+      apiClient.get('/sessions/history', { params }),
+    
+    // Get weekly statistics
+    getWeeklyStats: (weeks = 4) => 
+      apiClient.get(`/sessions/weekly?weeks=${weeks}`),
+    
+    // Update daily study goal
+    updateStudyGoal: (data) => apiClient.put('/sessions/goal', data),
+    
+    // Get personalized study recommendations
+    getRecommendations: () => apiClient.get('/sessions/recommendations'),
   },
 
   admin: {

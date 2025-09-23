@@ -9,11 +9,14 @@ import {
   Modal,
   FlatList,
   Dimensions,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Calendar } from 'react-native-calendars';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ThemeContext } from '../theme/ThemeContext';
+import api from '../services/api'; // Import API service
 
 const { width } = Dimensions.get('window');
 
@@ -31,61 +34,120 @@ const PlannerScreen = () => {
   const [editingTask, setEditingTask] = useState(null);
   const [markedDates, setMarkedDates] = useState({});
 
-  // Subject options
-  const subjects = [
-    'General',
-    'Operating Systems',
-    'Data Structures',
-    'Computer Networks',
-    'Algorithms',
-    'Database Systems',
-    'Theory of Computation',
-    'Digital Logic',
-    'Mathematics',
-  ];
+  // Add state for syllabus integration
+  const [subjects, setSubjects] = useState([]);
+  const [topics, setTopics] = useState([]);
+  const [subtopics, setSubtopics] = useState([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState(null);
+  const [selectedTopicId, setSelectedTopicId] = useState(null);
+  const [selectedSubtopicId, setSelectedSubtopicId] = useState(null);
 
-  // Initialize with mock data
+  // Add loading and error states
+  const [isLoading, setIsLoading] = useState(false);
+  const [isCalendarLoading, setIsCalendarLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch syllabus subjects on component mount
   useEffect(() => {
-    const initialTasks = {
-      [new Date().toISOString().split('T')[0]]: [
-        {
-          id: '1',
-          title: 'Review Process Scheduling Algorithms',
-          notes: 'Focus on Round Robin, SJF, and FCFS',
-          subject: 'Operating Systems',
-          priority: 'high',
-          completed: false,
-          duration: '2 hours',
-        },
-        {
-          id: '2',
-          title: 'Solve practice problems on Binary Trees',
-          notes: 'At least 5 problems from the question bank',
-          subject: 'Data Structures',
-          priority: 'medium',
-          completed: true,
-          duration: '1.5 hours',
-        },
-      ],
-      // Add a task for tomorrow's date
-      [new Date(new Date().setDate(new Date().getDate() + 1))
-        .toISOString()
-        .split('T')[0]]: [
-        {
-          id: '3',
-          title: 'Watch lecture on TCP/IP Protocol',
-          notes: '',
-          subject: 'Computer Networks',
-          priority: 'medium',
-          completed: false,
-          duration: '1 hour',
-        },
-      ],
+    const fetchSubjects = async () => {
+      try {
+        const response = await api.academic.getSyllabusTree();
+        if (response.data) {
+          // Add a "General" option for tasks not tied to specific subjects
+          const subjectList = [
+            { id: 'general', name: 'General' },
+            ...response.data,
+          ];
+          setSubjects(subjectList);
+        }
+      } catch (error) {
+        console.error('Error fetching subjects:', error);
+        // Fall back to basic subjects if API fails
+        setSubjects([
+          { id: 'general', name: 'General' },
+          { id: 'os', name: 'Operating Systems' },
+          { id: 'ds', name: 'Data Structures' },
+          { id: 'cn', name: 'Computer Networks' },
+          { id: 'algo', name: 'Algorithms' },
+          { id: 'db', name: 'Database Systems' },
+          { id: 'toc', name: 'Theory of Computation' },
+          { id: 'dl', name: 'Digital Logic' },
+          { id: 'math', name: 'Mathematics' },
+        ]);
+      }
     };
 
-    setTasks(initialTasks);
-    updateMarkedDates(initialTasks);
+    fetchSubjects();
   }, []);
+
+  // Fetch tasks for all dates to mark calendar
+  useEffect(() => {
+    const fetchAllTasks = async () => {
+      setIsCalendarLoading(true);
+      try {
+        // In a real scenario, you might want to fetch only month view
+        // For now, we'll fetch all tasks
+        const response = await api.planner.getAllTasks();
+
+        // Group tasks by date for easier access
+        const tasksByDate = {};
+
+        if (response.data) {
+          response.data.forEach(task => {
+            const taskDate = task.date.split('T')[0];
+
+            if (!tasksByDate[taskDate]) {
+              tasksByDate[taskDate] = [];
+            }
+
+            tasksByDate[taskDate].push(task);
+          });
+
+          setTasks(tasksByDate);
+          updateMarkedDates(tasksByDate);
+        }
+      } catch (error) {
+        console.error('Error fetching all tasks:', error);
+        setError('Failed to load your tasks. Please try again later.');
+      } finally {
+        setIsCalendarLoading(false);
+      }
+    };
+
+    fetchAllTasks();
+  }, []);
+
+  // Fetch tasks when selected date changes
+  useEffect(() => {
+    const fetchTasksForDate = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const response = await api.planner.getTasksByDate(selectedDate);
+
+        const updatedTasks = { ...tasks };
+
+        if (response.data) {
+          updatedTasks[selectedDate] = response.data;
+          setTasks(updatedTasks);
+          updateMarkedDates(updatedTasks);
+        } else {
+          // If no tasks are returned, set an empty array
+          updatedTasks[selectedDate] = [];
+          setTasks(updatedTasks);
+        }
+      } catch (error) {
+        console.error('Error fetching tasks for date:', error);
+        setError('Failed to load tasks for this date. Please try again.');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchTasksForDate();
+  }, [selectedDate]);
 
   // Update calendar marked dates based on tasks
   const updateMarkedDates = taskData => {
@@ -131,7 +193,7 @@ const PlannerScreen = () => {
 
     // Remove selection from previously selected date
     Object.keys(updatedMarkedDates).forEach(date => {
-      if (updatedMarkedDates[date].selected) {
+      if (updatedMarkedDates[date]?.selected) {
         updatedMarkedDates[date] = {
           ...updatedMarkedDates[date],
           selected: false,
@@ -149,6 +211,92 @@ const PlannerScreen = () => {
     setMarkedDates(updatedMarkedDates);
   };
 
+  // Fetch topics when subject changes
+  useEffect(() => {
+    if (selectedSubjectId && selectedSubjectId !== 'general') {
+      const fetchTopics = async () => {
+        try {
+          const response = await api.academic.getSubjectDetail(
+            selectedSubjectId,
+          );
+          if (response.data && response.data.units) {
+            // Flatten topics from all units
+            const allTopics = [];
+            response.data.units.forEach(unit => {
+              unit.topics.forEach(topic => {
+                allTopics.push({
+                  id: topic.id,
+                  name: topic.name,
+                  unitId: unit.id,
+                  unitName: unit.name,
+                });
+              });
+            });
+            setTopics(allTopics);
+            setSelectedTopicId(null);
+            setSubtopics([]);
+            setSelectedSubtopicId(null);
+          }
+        } catch (error) {
+          console.error('Error fetching topics:', error);
+          setTopics([]);
+        }
+      };
+
+      fetchTopics();
+    } else {
+      // Reset topics and subtopics when "General" is selected
+      setTopics([]);
+      setSubtopics([]);
+      setSelectedTopicId(null);
+      setSelectedSubtopicId(null);
+    }
+  }, [selectedSubjectId]);
+
+  // Fetch subtopics when topic changes
+  useEffect(() => {
+    if (selectedTopicId) {
+      const fetchSubtopics = async () => {
+        try {
+          // Find the selected topic in our local state
+          const selectedTopic = topics.find(t => t.id === selectedTopicId);
+          if (selectedTopic) {
+            // Get the subject detail to extract subtopics
+            const response = await api.academic.getSubjectDetail(
+              selectedSubjectId,
+            );
+            if (response.data && response.data.units) {
+              // Find the unit containing our topic
+              const unit = response.data.units.find(u =>
+                u.topics.some(t => t.id === selectedTopicId),
+              );
+
+              if (unit) {
+                // Find the topic
+                const topic = unit.topics.find(t => t.id === selectedTopicId);
+                if (topic && topic.subtopics) {
+                  setSubtopics(topic.subtopics);
+                  return;
+                }
+              }
+            }
+            // If we can't find subtopics, set empty array
+            setSubtopics([]);
+            setSelectedSubtopicId(null);
+          }
+        } catch (error) {
+          console.error('Error fetching subtopics:', error);
+          setSubtopics([]);
+        }
+      };
+
+      fetchSubtopics();
+    } else {
+      setSubtopics([]);
+      setSelectedSubtopicId(null);
+    }
+  }, [selectedTopicId, selectedSubjectId, topics]);
+
   const openAddTaskModal = () => {
     setModalVisible(true);
     setEditingTask(null);
@@ -156,77 +304,185 @@ const PlannerScreen = () => {
     setTaskNotes('');
     setTaskSubject('General');
     setTaskPriority('medium');
+    setSelectedSubjectId('general');
+    setSelectedTopicId(null);
+    setSelectedSubtopicId(null);
   };
 
   const openEditTaskModal = task => {
     setModalVisible(true);
     setEditingTask(task);
     setTaskTitle(task.title);
-    setTaskNotes(task.notes);
-    setTaskSubject(task.subject);
-    setTaskPriority(task.priority);
+    setTaskNotes(task.notes || '');
+
+    // Handle subject, topic and subtopic selection for existing task
+    if (task.subject) {
+      setTaskSubject(task.subject);
+
+      // Find subject ID from name
+      const subject = subjects.find(s => s.name === task.subject);
+      if (subject) {
+        setSelectedSubjectId(subject.id);
+
+        // If task has topicId, set it
+        if (task.topicId) {
+          setSelectedTopicId(task.topicId);
+
+          // If task has subtopicId, set it
+          if (task.subtopicId) {
+            setSelectedSubtopicId(task.subtopicId);
+          }
+        }
+      }
+    } else {
+      setTaskSubject('General');
+      setSelectedSubjectId('general');
+    }
+
+    setTaskPriority(task.priority || 'medium');
   };
 
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!taskTitle.trim()) return;
 
-    const newTask = {
-      id: editingTask ? editingTask.id : Date.now().toString(),
-      title: taskTitle.trim(),
-      notes: taskNotes.trim(),
-      subject: taskSubject,
-      priority: taskPriority,
-      completed: editingTask ? editingTask.completed : false,
-      duration: '1 hour', // Default duration
-    };
+    setIsSubmitting(true);
 
-    const updatedTasks = { ...tasks };
+    try {
+      // Prepare the task data
+      const taskData = {
+        title: taskTitle.trim(),
+        notes: taskNotes.trim(),
+        date: selectedDate, // API expects ISO format
+        subject: taskSubject,
+        priority: taskPriority,
+      };
 
-    if (!updatedTasks[selectedDate]) {
-      updatedTasks[selectedDate] = [];
+      // Add topic/subtopic IDs if selected
+      if (selectedTopicId && selectedTopicId !== 'general') {
+        taskData.topicId = selectedTopicId;
+
+        if (selectedSubtopicId) {
+          taskData.subtopicId = selectedSubtopicId;
+        }
+      }
+
+      let response;
+
+      if (editingTask) {
+        // Update existing task
+        response = await api.planner.updateTask(editingTask.id, taskData);
+
+        // Update the local state
+        const updatedTasks = { ...tasks };
+        if (updatedTasks[selectedDate]) {
+          updatedTasks[selectedDate] = updatedTasks[selectedDate].map(task =>
+            task.id === editingTask.id ? { ...task, ...taskData } : task,
+          );
+          setTasks(updatedTasks);
+          updateMarkedDates(updatedTasks);
+        }
+      } else {
+        // Create new task
+        response = await api.planner.createTask(taskData);
+
+        // Update the local state
+        const updatedTasks = { ...tasks };
+        if (!updatedTasks[selectedDate]) {
+          updatedTasks[selectedDate] = [];
+        }
+        updatedTasks[selectedDate].push(response.data);
+        setTasks(updatedTasks);
+        updateMarkedDates(updatedTasks);
+      }
+
+      setModalVisible(false);
+    } catch (error) {
+      console.error('Error saving task:', error);
+      Alert.alert('Error', 'Failed to save the task. Please try again later.', [
+        { text: 'OK' },
+      ]);
+    } finally {
+      setIsSubmitting(false);
     }
-
-    if (editingTask) {
-      // Update existing task
-      updatedTasks[selectedDate] = updatedTasks[selectedDate].map(task =>
-        task.id === editingTask.id ? newTask : task,
-      );
-    } else {
-      // Add new task
-      updatedTasks[selectedDate].push(newTask);
-    }
-
-    setTasks(updatedTasks);
-    updateMarkedDates(updatedTasks);
-    setModalVisible(false);
   };
 
-  const toggleTaskCompletion = taskId => {
-    const updatedTasks = { ...tasks };
+  const toggleTaskCompletion = async taskId => {
+    try {
+      // Find the task
+      const taskToUpdate = tasks[selectedDate].find(task => task.id === taskId);
+      if (!taskToUpdate) return;
 
-    if (updatedTasks[selectedDate]) {
+      // Update optimistically for a better user experience
+      const updatedTasks = { ...tasks };
       updatedTasks[selectedDate] = updatedTasks[selectedDate].map(task =>
         task.id === taskId ? { ...task, completed: !task.completed } : task,
       );
-
       setTasks(updatedTasks);
+      updateMarkedDates(updatedTasks);
+
+      // Make API call
+      await api.planner.updateTask(taskId, {
+        completed: !taskToUpdate.completed,
+      });
+
+      // No need to update state again if successful since we already did it optimistically
+    } catch (error) {
+      console.error('Error toggling task completion:', error);
+
+      // Revert the optimistic update if API call fails
+      const revertedTasks = { ...tasks };
+      revertedTasks[selectedDate] = revertedTasks[selectedDate].map(task =>
+        task.id === taskId ? { ...task, completed: !task.completed } : task,
+      );
+      setTasks(revertedTasks);
+      updateMarkedDates(revertedTasks);
+
+      Alert.alert('Error', 'Failed to update the task. Please try again.', [
+        { text: 'OK' },
+      ]);
     }
   };
 
-  const deleteTask = taskId => {
-    const updatedTasks = { ...tasks };
-
-    if (updatedTasks[selectedDate]) {
+  const deleteTask = async taskId => {
+    try {
+      // Delete optimistically for a better user experience
+      const updatedTasks = { ...tasks };
       updatedTasks[selectedDate] = updatedTasks[selectedDate].filter(
         task => task.id !== taskId,
       );
 
+      // If no tasks left for this date, clean up
       if (updatedTasks[selectedDate].length === 0) {
         delete updatedTasks[selectedDate];
       }
 
       setTasks(updatedTasks);
       updateMarkedDates(updatedTasks);
+
+      // Make API call
+      await api.planner.deleteTask(taskId);
+
+      // No need to update state again if successful
+    } catch (error) {
+      console.error('Error deleting task:', error);
+
+      // Fetch tasks again to restore correct state if API call fails
+      try {
+        const response = await api.planner.getTasksByDate(selectedDate);
+        const refreshedTasks = { ...tasks };
+        refreshedTasks[selectedDate] = response.data || [];
+        setTasks(refreshedTasks);
+        updateMarkedDates(refreshedTasks);
+      } catch (refreshError) {
+        console.error(
+          'Error refreshing tasks after delete failure:',
+          refreshError,
+        );
+      }
+
+      Alert.alert('Error', 'Failed to delete the task. Please try again.', [
+        { text: 'OK' },
+      ]);
     }
   };
 
@@ -252,6 +508,18 @@ const PlannerScreen = () => {
     });
   };
 
+  // Find subject name from ID
+  const getSubjectNameFromId = subjectId => {
+    const subject = subjects.find(s => s.id === subjectId);
+    return subject ? subject.name : 'General';
+  };
+
+  // Find topic name from ID
+  const getTopicNameFromId = topicId => {
+    const topic = topics.find(t => t.id === topicId);
+    return topic ? topic.name : '';
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
@@ -267,29 +535,40 @@ const PlannerScreen = () => {
       </View>
 
       <View style={styles.calendarContainer}>
-        <Calendar
-          current={selectedDate}
-          onDayPress={handleDayPress}
-          markedDates={markedDates}
-          theme={{
-            calendarBackground: theme.card,
-            textSectionTitleColor: theme.text,
-            selectedDayBackgroundColor: theme.primary,
-            selectedDayTextColor: '#FFFFFF',
-            todayTextColor: theme.primary,
-            dayTextColor: theme.text,
-            textDisabledColor: `${theme.text}50`,
-            dotColor: theme.primary,
-            monthTextColor: theme.text,
-            indicatorColor: theme.primary,
-            textDayFontWeight: '400',
-            textMonthFontWeight: 'bold',
-            textDayHeaderFontWeight: '500',
-            textDayFontSize: 16,
-            textMonthFontSize: 16,
-            textDayHeaderFontSize: 14,
-          }}
-        />
+        {isCalendarLoading ? (
+          <View
+            style={[styles.loadingContainer, { backgroundColor: theme.card }]}
+          >
+            <ActivityIndicator size="large" color={theme.primary} />
+            <Text style={[styles.loadingText, { color: theme.text }]}>
+              Loading your schedule...
+            </Text>
+          </View>
+        ) : (
+          <Calendar
+            current={selectedDate}
+            onDayPress={handleDayPress}
+            markedDates={markedDates}
+            theme={{
+              calendarBackground: theme.card,
+              textSectionTitleColor: theme.text,
+              selectedDayBackgroundColor: theme.primary,
+              selectedDayTextColor: '#FFFFFF',
+              todayTextColor: theme.primary,
+              dayTextColor: theme.text,
+              textDisabledColor: `${theme.text}50`,
+              dotColor: theme.primary,
+              monthTextColor: theme.text,
+              indicatorColor: theme.primary,
+              textDayFontWeight: '400',
+              textMonthFontWeight: 'bold',
+              textDayHeaderFontWeight: '500',
+              textDayFontSize: 16,
+              textMonthFontSize: 16,
+              textDayHeaderFontSize: 14,
+            }}
+          />
+        )}
       </View>
 
       <View style={styles.tasksContainer}>
@@ -297,7 +576,59 @@ const PlannerScreen = () => {
           {formatDate(selectedDate)}
         </Text>
 
-        {!tasks[selectedDate] || tasks[selectedDate].length === 0 ? (
+        {isLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={theme.primary} />
+            <Text style={[styles.loadingText, { color: theme.text }]}>
+              Loading tasks...
+            </Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Icon name="alert-circle-outline" size={48} color={theme.error} />
+            <Text style={[styles.errorText, { color: theme.error }]}>
+              {error}
+            </Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: theme.primary }]}
+              onPress={() => {
+                const fetchTasksForDate = async () => {
+                  setIsLoading(true);
+                  setError(null);
+
+                  try {
+                    const response = await api.planner.getTasksByDate(
+                      selectedDate,
+                    );
+
+                    const updatedTasks = { ...tasks };
+
+                    if (response.data) {
+                      updatedTasks[selectedDate] = response.data;
+                      setTasks(updatedTasks);
+                      updateMarkedDates(updatedMarkedDates);
+                    } else {
+                      // If no tasks are returned, set an empty array
+                      updatedTasks[selectedDate] = [];
+                      setTasks(updatedTasks);
+                    }
+                  } catch (error) {
+                    console.error('Error fetching tasks for date:', error);
+                    setError(
+                      'Failed to load tasks for this date. Please try again.',
+                    );
+                  } finally {
+                    setIsLoading(false);
+                  }
+                };
+
+                fetchTasksForDate();
+              }}
+            >
+              <Text style={{ color: '#FFFFFF' }}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : !tasks[selectedDate] || tasks[selectedDate].length === 0 ? (
           <View style={styles.emptyContainer}>
             <Icon name="calendar-check" size={64} color={`${theme.text}30`} />
             <Text style={[styles.emptyText, { color: `${theme.text}70` }]}>
@@ -387,16 +718,19 @@ const PlannerScreen = () => {
                       >
                         {item.subject}
                       </Text>
-                    </View>
 
-                    <Text
-                      style={[
-                        styles.taskDuration,
-                        { color: `${theme.text}70` },
-                      ]}
-                    >
-                      {item.duration}
-                    </Text>
+                      {/* Show topic/subtopic if available */}
+                      {item.topicId && (
+                        <Text
+                          style={[
+                            styles.taskTopic,
+                            { color: `${theme.text}70` },
+                          ]}
+                        >
+                          • {item.topicName || getTopicNameFromId(item.topicId)}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 </View>
               </View>
@@ -472,35 +806,205 @@ const PlannerScreen = () => {
               >
                 {subjects.map(subject => (
                   <TouchableOpacity
-                    key={subject}
+                    key={subject.id}
                     style={[
                       styles.subjectOption,
                       { borderColor: `${theme.text}30` },
-                      taskSubject === subject && {
+                      selectedSubjectId === subject.id && {
                         backgroundColor: `${theme.primary}20`,
                         borderColor: theme.primary,
                       },
                     ]}
-                    onPress={() => setTaskSubject(subject)}
+                    onPress={() => {
+                      setSelectedSubjectId(subject.id);
+                      setTaskSubject(subject.name);
+                      // Clear topic and subtopic when changing subject
+                      setSelectedTopicId(null);
+                      setSelectedSubtopicId(null);
+                    }}
                   >
                     <Text
                       style={[
                         styles.subjectText,
                         {
                           color:
-                            taskSubject === subject
+                            selectedSubjectId === subject.id
                               ? theme.primary
                               : theme.text,
                         },
                       ]}
                     >
-                      {subject}
+                      {subject.name}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
 
-              <Text style={[styles.inputLabel, { color: theme.text }]}>
+              {/* Show topics if a subject other than General is selected */}
+              {selectedSubjectId &&
+                selectedSubjectId !== 'general' &&
+                topics.length > 0 && (
+                  <>
+                    <Text
+                      style={[
+                        styles.inputLabel,
+                        { color: theme.text, marginTop: 16 },
+                      ]}
+                    >
+                      Topic
+                    </Text>
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={styles.topicSelector}
+                    >
+                      <TouchableOpacity
+                        key="none"
+                        style={[
+                          styles.topicOption,
+                          { borderColor: `${theme.text}30` },
+                          !selectedTopicId && {
+                            backgroundColor: `${theme.primary}20`,
+                            borderColor: theme.primary,
+                          },
+                        ]}
+                        onPress={() => {
+                          setSelectedTopicId(null);
+                          setSelectedSubtopicId(null);
+                        }}
+                      >
+                        <Text
+                          style={[
+                            styles.topicText,
+                            {
+                              color: !selectedTopicId
+                                ? theme.primary
+                                : theme.text,
+                            },
+                          ]}
+                        >
+                          None
+                        </Text>
+                      </TouchableOpacity>
+
+                      {topics.map(topic => (
+                        <TouchableOpacity
+                          key={topic.id}
+                          style={[
+                            styles.topicOption,
+                            { borderColor: `${theme.text}30` },
+                            selectedTopicId === topic.id && {
+                              backgroundColor: `${theme.primary}20`,
+                              borderColor: theme.primary,
+                            },
+                          ]}
+                          onPress={() => {
+                            setSelectedTopicId(topic.id);
+                            // Clear subtopic when changing topic
+                            setSelectedSubtopicId(null);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.topicText,
+                              {
+                                color:
+                                  selectedTopicId === topic.id
+                                    ? theme.primary
+                                    : theme.text,
+                              },
+                            ]}
+                          >
+                            {topic.name}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </>
+                )}
+
+              {/* Show subtopics if a topic is selected */}
+              {selectedTopicId && subtopics.length > 0 && (
+                <>
+                  <Text
+                    style={[
+                      styles.inputLabel,
+                      { color: theme.text, marginTop: 16 },
+                    ]}
+                  >
+                    Subtopic
+                  </Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.subtopicSelector}
+                  >
+                    <TouchableOpacity
+                      key="none"
+                      style={[
+                        styles.subtopicOption,
+                        { borderColor: `${theme.text}30` },
+                        !selectedSubtopicId && {
+                          backgroundColor: `${theme.primary}20`,
+                          borderColor: theme.primary,
+                        },
+                      ]}
+                      onPress={() => {
+                        setSelectedSubtopicId(null);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.subtopicText,
+                          {
+                            color: !selectedSubtopicId
+                              ? theme.primary
+                              : theme.text,
+                          },
+                        ]}
+                      >
+                        None
+                      </Text>
+                    </TouchableOpacity>
+
+                    {subtopics.map(subtopic => (
+                      <TouchableOpacity
+                        key={subtopic.id}
+                        style={[
+                          styles.subtopicOption,
+                          { borderColor: `${theme.text}30` },
+                          selectedSubtopicId === subtopic.id && {
+                            backgroundColor: `${theme.primary}20`,
+                            borderColor: theme.primary,
+                          },
+                        ]}
+                        onPress={() => setSelectedSubtopicId(subtopic.id)}
+                      >
+                        <Text
+                          style={[
+                            styles.subtopicText,
+                            {
+                              color:
+                                selectedSubtopicId === subtopic.id
+                                  ? theme.primary
+                                  : theme.text,
+                            },
+                          ]}
+                        >
+                          {subtopic.name}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </>
+              )}
+
+              <Text
+                style={[
+                  styles.inputLabel,
+                  { color: theme.text, marginTop: 16 },
+                ]}
+              >
                 Priority
               </Text>
               <View style={styles.prioritySelector}>
@@ -592,12 +1096,21 @@ const PlannerScreen = () => {
             </ScrollView>
 
             <TouchableOpacity
-              style={[styles.addTaskButton, { backgroundColor: theme.primary }]}
+              style={[
+                styles.addTaskButton,
+                { backgroundColor: theme.primary },
+                isSubmitting && { opacity: 0.7 },
+              ]}
               onPress={handleAddTask}
+              disabled={isSubmitting}
             >
-              <Text style={styles.addTaskButtonText}>
-                {editingTask ? 'Update Task' : 'Add Task'}
-              </Text>
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={styles.addTaskButtonText}>
+                  {editingTask ? 'Update Task' : 'Add Task'}
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -722,6 +1235,7 @@ const styles = StyleSheet.create({
   taskMetadata: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
   },
   priorityBadge: {
     width: 8,
@@ -732,6 +1246,10 @@ const styles = StyleSheet.create({
   taskSubject: {
     fontSize: 13,
     fontWeight: '500',
+  },
+  taskTopic: {
+    fontSize: 12,
+    marginLeft: 4,
   },
   taskDuration: {
     fontSize: 13,
@@ -802,6 +1320,36 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
+  topicSelector: {
+    flexDirection: 'row',
+    paddingBottom: 16,
+  },
+  topicOption: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  topicText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  subtopicSelector: {
+    flexDirection: 'row',
+    paddingBottom: 16,
+  },
+  subtopicOption: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  subtopicText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
   prioritySelector: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -832,6 +1380,32 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  loadingContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 10,
+    marginBottom: 20,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
   },
 });
 
