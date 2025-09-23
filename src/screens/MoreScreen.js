@@ -26,6 +26,11 @@ const MoreScreen = ({ navigation }) => {
     { name: 'Timer', screen: 'Timer', icon: 'time-outline' },
     { name: 'Subject Detail', screen: 'SubjectDetail', icon: 'book-outline' },
     { name: 'Quiz', screen: 'Quiz', icon: 'help-circle-outline' },
+    {
+      name: 'Quiz History',
+      screen: 'QuizHistory',
+      icon: 'document-text-outline',
+    },
     { name: 'Settings', screen: 'Settings', icon: 'settings-outline' },
     { name: 'Analytics', screen: 'Analytics', icon: 'bar-chart-outline' },
     { name: 'Resources', screen: 'Resources', icon: 'play-circle-outline' },

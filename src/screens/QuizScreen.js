@@ -15,13 +15,13 @@ import {
   SafeAreaView,
   Alert,
   Dimensions,
-  TextInput,
 } from 'react-native';
 import { ThemeContext } from '../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CustomHeader from '../components/CustomHeader';
 import Slider from '@react-native-community/slider';
 import DropDownPicker from 'react-native-dropdown-picker';
+import api from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -29,37 +29,11 @@ const QuizScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
   const initialParams = route.params || {};
 
-  // Subject and topic data
-  const subjects = [
-    { id: 'os', name: 'Operating Systems' },
-    { id: 'ds', name: 'Data Structures' },
-    { id: 'algo', name: 'Algorithms' },
-    { id: 'dbms', name: 'Database Management' },
-    { id: 'cn', name: 'Computer Networks' },
-    { id: 'coa', name: 'Computer Organization & Architecture' },
-    { id: 'toc', name: 'Theory of Computation' },
-    { id: 'cg', name: 'Computer Graphics' },
-    { id: 'se', name: 'Software Engineering' },
-  ];
-
-  const topics = {
-    os: [
-      { id: 'os_proc', name: 'Process Management' },
-      { id: 'os_sched', name: 'CPU Scheduling' },
-      { id: 'os_mem', name: 'Memory Management' },
-      { id: 'os_file', name: 'File Systems' },
-      { id: 'os_io', name: 'I/O Systems' },
-    ],
-    ds: [
-      { id: 'ds_arrays', name: 'Arrays & Strings' },
-      { id: 'ds_linkedlist', name: 'Linked Lists' },
-      { id: 'ds_stack', name: 'Stacks & Queues' },
-      { id: 'ds_tree', name: 'Trees' },
-      { id: 'ds_graph', name: 'Graphs' },
-      { id: 'ds_hash', name: 'Hash Tables' },
-    ],
-    // Add topics for other subjects as needed
-  };
+  // State for subjects and topics that will be fetched from the API
+  const [subjects, setSubjects] = useState([]);
+  const [topics, setTopics] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState(null);
 
   // Quiz setup state
   const [setupMode, setSetupMode] = useState(true);
@@ -71,20 +45,17 @@ const QuizScreen = ({ navigation, route }) => {
     initialParams.topicId || null,
   );
 
-  // Add these dropdown state variables
+  // Dropdown state
   const [subjectOpen, setSubjectOpen] = useState(false);
   const [topicOpen, setTopicOpen] = useState(false);
   const [subjectItems, setSubjectItems] = useState([
     { label: 'All Subjects', value: 'all' },
-    ...(subjects || []).map(subject => ({
-      label: subject.name,
-      value: subject.id,
-    })),
   ]);
   const [topicItems, setTopicItems] = useState([
     { label: 'All Topics', value: 'all' },
   ]);
 
+  // Quiz configuration
   const [questionCount, setQuestionCount] = useState(
     initialParams.questionCount || 10,
   );
@@ -92,44 +63,92 @@ const QuizScreen = ({ navigation, route }) => {
     initialParams.difficulty || 'medium',
   );
   const [timerEnabled, setTimerEnabled] = useState(true);
-  const [timeLimit, setTimeLimit] = useState(initialParams.timeLimit || 30); // Default 30 minutes
+  const [timeLimit, setTimeLimit] = useState(initialParams.timeLimit || 30);
 
-  // Quiz progress state
-  const [loading, setLoading] = useState(false);
+  // Quiz state
   const [quiz, setQuiz] = useState(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState({});
-  const [quizStartTime, setQuizStartTime] = useState(null);
   const [timeSpent, setTimeSpent] = useState(0);
-  const [remainingTime, setRemainingTime] = useState(timeLimit * 60); // in seconds
+  const [remainingTime, setRemainingTime] = useState(timeLimit * 60);
+  const [submitting, setSubmitting] = useState(false);
+
+  // New state for generating quiz
+  const [generatingQuiz, setGeneratingQuiz] = useState(false);
 
   const timerRef = useRef(null);
+
+  // Fetch subjects from the API
+  useEffect(() => {
+    const fetchSubjects = async () => {
+      try {
+        setLoading(true);
+        const response = await api.academic.getSyllabusTree();
+
+        // Map the response to the format expected by the dropdown
+        const subjectsData = response.data.map(subject => ({
+          id: subject.id,
+          name: subject.name,
+          topics: subject.units.flatMap(unit =>
+            unit.topics.map(topic => ({
+              id: topic.id,
+              name: topic.name,
+            })),
+          ),
+        }));
+
+        setSubjects(subjectsData);
+
+        // Create a topics object organized by subject ID
+        const topicsObj = {};
+        subjectsData.forEach(subject => {
+          topicsObj[subject.id] = subject.topics;
+        });
+        setTopics(topicsObj);
+
+        // Update dropdown items
+        setSubjectItems([
+          { label: 'All Subjects', value: 'all' },
+          ...subjectsData.map(subject => ({
+            label: subject.name,
+            value: subject.id,
+          })),
+        ]);
+      } catch (error) {
+        console.error('Error fetching subjects:', error);
+        setApiError('Failed to load subjects. Please try again later.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchSubjects();
+  }, []);
 
   // Timer setup
   useEffect(() => {
     if (!setupMode && quiz && timerEnabled) {
-      // Clear any existing timer first
+      // Clear any existing timer
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
 
+      // Set up the timer based on time limit or elapsed time tracking
       timerRef.current = setInterval(() => {
-        setTimeSpent(prev => prev + 1);
-
         if (timeLimit > 0) {
+          // Countdown timer
           setRemainingTime(prev => {
             if (prev <= 1) {
-              // Time's up - auto submit the quiz
+              // Time's up, submit the quiz
               clearInterval(timerRef.current);
-              // Use setTimeout to avoid state updates during render
-              setTimeout(() => {
-                // Call a locally defined function instead of handleSubmitQuiz
-                submitQuizOnTimeout();
-              }, 0);
+              submitQuizOnTimeout();
               return 0;
             }
             return prev - 1;
           });
+        } else {
+          // Elapsed time counter
+          setTimeSpent(prev => prev + 1);
         }
       }, 1000);
 
@@ -139,7 +158,32 @@ const QuizScreen = ({ navigation, route }) => {
         }
       };
     }
-  }, [setupMode, quiz, timerEnabled, timeLimit]); // Remove handleSubmitQuiz from dependencies
+  }, [setupMode, quiz, timerEnabled, timeLimit]);
+
+  // Update topics when subject changes
+  useEffect(() => {
+    if (selectedSubject && selectedSubject !== 'all') {
+      const topicsForSubject = getTopicsForSubject(selectedSubject);
+      setTopicItems([
+        { label: 'All Topics', value: 'all' },
+        ...topicsForSubject.map(topic => ({
+          label: topic.name,
+          value: topic.id,
+        })),
+      ]);
+    } else {
+      setTopicItems([{ label: 'All Topics', value: 'all' }]);
+    }
+  }, [selectedSubject]);
+
+  // Handle dropdown conflicts
+  useEffect(() => {
+    if (subjectOpen) setTopicOpen(false);
+  }, [subjectOpen]);
+
+  useEffect(() => {
+    if (topicOpen) setSubjectOpen(false);
+  }, [topicOpen]);
 
   const formatTime = seconds => {
     const mins = Math.floor(seconds / 60);
@@ -147,25 +191,62 @@ const QuizScreen = ({ navigation, route }) => {
     return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
   };
 
-  // Make sure this function is defined with useCallback to avoid issues
-  const handleStartQuiz = useCallback(() => {
-    // Generate quiz based on selected parameters
-    const newQuiz = {
-      id: generateUniqueId(),
-      title: getQuizTitle(),
-      subject: getSelectedSubjectName(),
-      topic: getSelectedTopicName(),
-      difficulty: difficulty,
-      questions: generateQuizQuestions(),
-    };
+  // Generate quiz from API
+  const handleStartQuiz = useCallback(async () => {
+    try {
+      setLoading(true);
+      setGeneratingQuiz(true); // Set the generating quiz state
 
-    // Reset quiz state
-    setQuiz(newQuiz);
-    setCurrentQuestionIndex(0);
-    setSelectedAnswers({});
-    setTimeSpent(0);
-    setRemainingTime(timeLimit * 60);
-    setSetupMode(false);
+      // Prepare quiz options
+      const quizOptions = {
+        subjectIds: selectedSubject === 'all' ? [] : [selectedSubject],
+        topicIds: selectedTopic === 'all' ? [] : [selectedTopic],
+        quizType: quizType.toUpperCase(),
+        difficulty: difficulty,
+        questionCount: questionCount,
+        isFullSyllabusTest: selectedSubject === 'all',
+      };
+
+      // Show a message that quiz generation might take time for specific topics
+      if (selectedTopic && selectedTopic !== 'all') {
+        Alert.alert(
+          'Generating Quiz',
+          'Creating a specialized quiz may take some time. Please wait...',
+          [{ text: 'OK' }],
+        );
+      }
+
+      // Call the API to generate a quiz
+      const response = await api.quizzes.generate(quizOptions);
+
+      // Reset quiz state
+      setQuiz(response.data);
+      setCurrentQuestionIndex(0);
+      setSelectedAnswers({});
+      setTimeSpent(0);
+      setRemainingTime(timeLimit * 60);
+      setSetupMode(false);
+    } catch (error) {
+      console.error('Error generating quiz:', error);
+
+      // More detailed error handling
+      if (error.message === 'Network Error') {
+        Alert.alert(
+          'Connection Issue',
+          'The quiz is taking longer than expected to generate. Please try again or select a broader topic.',
+          [{ text: 'OK' }],
+        );
+      } else {
+        Alert.alert(
+          'Quiz Generation Failed',
+          error.response?.data?.message || 'Failed to generate quiz. Please try again.',
+          [{ text: 'OK' }],
+        );
+      }
+    } finally {
+      setLoading(false);
+      setGeneratingQuiz(false); // Reset the generating quiz state
+    }
   }, [
     quizType,
     selectedSubject,
@@ -173,12 +254,14 @@ const QuizScreen = ({ navigation, route }) => {
     questionCount,
     difficulty,
     timeLimit,
-    timerEnabled,
   ]);
 
   // Helper function to check if quiz can be started
   const canStartQuiz = useCallback(() => {
-    return selectedSubject !== null && selectedTopic !== null;
+    return (
+      selectedSubject !== null &&
+      (selectedSubject === 'all' || selectedTopic !== null)
+    );
   }, [selectedSubject, selectedTopic]);
 
   const handleSelectAnswer = (questionId, answer) => {
@@ -204,65 +287,76 @@ const QuizScreen = ({ navigation, route }) => {
     return Object.keys(selectedAnswers).length === quiz.questions.length;
   };
 
-  const handleSubmitQuiz = useCallback(() => {
+  // Submit quiz to API
+  const handleSubmitQuiz = useCallback(async () => {
     // Clear timer
     if (timerRef.current) {
       clearInterval(timerRef.current);
     }
 
-    // Calculate results
-    let correctCount = 0;
-    const reviewData = quiz.questions.map(question => {
-      const isCorrect = selectedAnswers[question.id] === question.correctAnswer;
-      if (isCorrect) correctCount++;
+    try {
+      setSubmitting(true);
 
-      return {
-        questionId: question.id,
-        question: question.text,
-        correctAnswer: question.correctAnswer,
-        yourAnswer: selectedAnswers[question.id] || 'Not answered',
-        isCorrect,
-      };
-    });
-
-    const score = Math.round((correctCount / quiz.questions.length) * 100);
-
-    // Navigate to results screen
-    navigation.replace('QuizResult', {
-      result: {
-        quizId: quiz.id,
-        title: quiz.title,
-        subject: quiz.subject,
-        topic: quiz.topic,
-        difficulty: quiz.difficulty,
-        score,
-        correctAnswers: correctCount,
-        totalQuestions: quiz.questions.length,
+      // Prepare submission data
+      const submissionData = {
+        answers: Object.entries(selectedAnswers).map(
+          ([questionId, answer]) => ({
+            questionId,
+            selectedAnswer: answer,
+          }),
+        ),
         timeTaken: timeSpent,
-        feedback: {
-          mentorAnalysis: generateMockAnalysis(score, quiz.subject, quiz.topic),
-          questionByQuestionReview: reviewData,
-        },
-      },
-    });
+      };
+
+      // Submit the quiz
+      const response = await api.quizzes.submitQuiz(quiz.id, submissionData);
+
+      // Navigate to results screen with the attempt ID
+      navigation.replace('QuizResult', { attemptId: response.data.attemptId });
+    } catch (error) {
+      console.error('Error submitting quiz:', error);
+      Alert.alert(
+        'Submission Failed',
+        error.response?.data?.message ||
+          'Failed to submit quiz. Please try again.',
+        [{ text: 'OK' }],
+      );
+      setSubmitting(false);
+    }
   }, [quiz, selectedAnswers, timeSpent, navigation]);
 
-  const generateMockAnalysis = (score, subject, topic) => {
-    if (score >= 80) {
-      return `Excellent work! You've shown a strong understanding of ${subject} ${
-        topic !== 'All Topics' ? `especially in ${topic}` : ''
-      }. Keep up the great work!`;
-    } else if (score >= 60) {
-      return `Good job! You have a solid grasp of ${subject} ${
-        topic !== 'All Topics' ? `specifically ${topic}` : ''
-      }. Some concepts could use more review.`;
-    } else {
-      return `You've made a good start with ${subject} ${
-        topic !== 'All Topics' ? `particularly ${topic}` : ''
-      }, but this area needs more attention. Consider reviewing the core concepts again.`;
-    }
+  const submitQuizOnTimeout = () => {
+    if (!quiz) return;
+
+    // Handle the same as manual submission
+    handleSubmitQuiz();
   };
 
+  const getTopicsForSubject = subjectId => {
+    const selectedSubjectData = subjects.find(s => s.id === subjectId);
+    return selectedSubjectData?.topics || [];
+  };
+
+  const getSelectedSubjectName = () => {
+    if (!selectedSubject) return 'General';
+    if (selectedSubject === 'all') return 'Multiple Subjects';
+
+    const subject = subjects.find(s => s.id === selectedSubject);
+    return subject ? subject.name : 'General';
+  };
+
+  const getSelectedTopicName = () => {
+    if (!selectedTopic) return 'All Topics';
+    if (selectedTopic === 'all') return 'Multiple Topics';
+
+    const subject = subjects.find(s => s.id === selectedSubject);
+    if (!subject || !subject.topics) return 'All Topics';
+
+    const topic = subject.topics.find(t => t.id === selectedTopic);
+    return topic ? topic.name : 'All Topics';
+  };
+
+  // UI rendering
   const renderQuizSetup = () => {
     return (
       <ScrollView style={styles.setupContainer}>
@@ -609,20 +703,20 @@ const QuizScreen = ({ navigation, route }) => {
           style={[
             styles.startButton,
             {
-              backgroundColor: canStartQuiz()
+              backgroundColor: canStartQuiz() && !generatingQuiz
                 ? theme.primary
                 : `${theme.primary}50`,
-              opacity: canStartQuiz() ? 1 : 0.7,
+              opacity: canStartQuiz() && !generatingQuiz ? 1 : 0.7,
             },
           ]}
           onPress={handleStartQuiz}
-          disabled={!canStartQuiz()}
+          disabled={!canStartQuiz() || generatingQuiz}
         >
-          <Icon name="play" size={24} color="#FFFFFF" />
+          <Icon name={generatingQuiz ? "loading" : "play"} size={24} color="#FFFFFF" />
           <Text style={styles.startButtonText}>
-            {loading ? 'Loading Quiz...' : 'Start Quiz'}
+            {generatingQuiz ? 'Generating Quiz...' : 'Start Quiz'}
           </Text>
-          {loading && (
+          {(loading || generatingQuiz) && (
             <ActivityIndicator
               color="#FFFFFF"
               size="small"
@@ -640,8 +734,23 @@ const QuizScreen = ({ navigation, route }) => {
     );
   };
 
+  // When rendering quiz content, use the actual quiz data from API
   const renderQuizContent = () => {
-    if (!quiz || !quiz.questions || !quiz.questions.length) return null;
+    if (!quiz || !quiz.questions || !quiz.questions.length) {
+      return (
+        <View
+          style={[
+            styles.loadingContainer,
+            { backgroundColor: theme.background },
+          ]}
+        >
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.text }]}>
+            Loading quiz...
+          </Text>
+        </View>
+      );
+    }
 
     const currentQuestion = quiz.questions[currentQuestionIndex];
     const isAnswered = selectedAnswers[currentQuestion.id] !== undefined;
@@ -859,164 +968,6 @@ const QuizScreen = ({ navigation, route }) => {
     );
   };
 
-  // Add this helper function to the top of your component
-  const getTopicsForSubject = subjectId => {
-    const selectedSubjectData = subjects.find(s => s.id === subjectId);
-    // Return empty array if no topics found
-    if (!subjectId) return [];
-
-    return (
-      selectedSubjectData?.topics ||
-      (topics && topics[subjectId]) ||
-      topics[subjectId] ||
-      []
-    );
-  };
-
-  // Add these helper functions before the return statement
-  const generateUniqueId = () => {
-    return (
-      Math.random().toString(36).substring(2, 15) +
-      Math.random().toString(36).substring(2, 15)
-    );
-  };
-
-  const getQuizTitle = () => {
-    switch (quizType) {
-      case 'pyq':
-        return `PYQ Test: ${getSelectedTopicName()} (${getSelectedSubjectName()})`;
-      case 'ai':
-      default:
-        return `AI Quiz: ${getSelectedTopicName()} (${getSelectedSubjectName()})`;
-    }
-  };
-
-  const getSelectedSubjectName = () => {
-    if (!selectedSubject) return 'General';
-    if (selectedSubject === 'all') return 'All Subjects';
-
-    const subject = subjects.find(s => s.id === selectedSubject);
-    return subject ? subject.name : 'General';
-  };
-
-  const getSelectedTopicName = () => {
-    if (!selectedTopic) return 'All Topics';
-    if (selectedTopic === 'all') return 'All Topics';
-
-    const subject = subjects.find(s => s.id === selectedSubject);
-    if (!subject || !subject.topics) return 'All Topics';
-
-    const topic = subject.topics.find(t => t.id === selectedTopic);
-    return topic ? topic.name : 'All Topics';
-  };
-
-  // Sample quiz generation function - replace with actual implementation
-  const generateQuizQuestions = () => {
-    // For "All Subjects" and "All Topics" selections, we'd pull from a broader set
-    const isAllSubjects = selectedSubject === 'all';
-    const isAllTopics = selectedTopic === 'all';
-
-    // In a real implementation, you'd query your database differently based on these flags
-    // For now, we'll just mock it with sample questions
-
-    return Array(questionCount)
-      .fill()
-      .map((_, i) => ({
-        id: `q${i + 1}`,
-        text: `Sample ${quizType === 'pyq' ? 'PYQ' : 'AI-generated'} question ${
-          i + 1
-        } for ${
-          isAllSubjects ? 'multiple subjects' : getSelectedSubjectName()
-        } ${
-          isAllTopics
-            ? '(covering various topics)'
-            : `(${getSelectedTopicName()})`
-        }`,
-        options: ['Option A', 'Option B', 'Option C', 'Option D'],
-        correctAnswer: 'Option A',
-        difficulty:
-          difficulty === 'auto'
-            ? ['easy', 'medium', 'hard'][i % 3]
-            : difficulty,
-      }));
-  };
-
-  // Add this function for timer timeout
-  const submitQuizOnTimeout = () => {
-    if (!quiz) return;
-
-    // Clear timer
-    if (timerRef.current) {
-      clearInterval(timerRef.current);
-    }
-
-    // Calculate results - same logic as handleSubmitQuiz but called only for timer
-    let correctCount = 0;
-    const reviewData = quiz.questions.map(question => {
-      const isCorrect = selectedAnswers[question.id] === question.correctAnswer;
-      if (isCorrect) correctCount++;
-
-      return {
-        questionId: question.id,
-        question: question.text,
-        correctAnswer: question.correctAnswer,
-        yourAnswer: selectedAnswers[question.id] || 'Not answered',
-        isCorrect,
-      };
-    });
-
-    const score = Math.round((correctCount / quiz.questions.length) * 100);
-
-    // Navigate to results screen
-    navigation.replace('QuizResult', {
-      result: {
-        quizId: quiz.id,
-        title: quiz.title,
-        subject: quiz.subject,
-        topic: quiz.topic,
-        difficulty: quiz.difficulty,
-        score,
-        correctAnswers: correctCount,
-        totalQuestions: quiz.questions.length,
-        timeTaken: timeSpent,
-        feedback: {
-          mentorAnalysis: generateMockAnalysis(score, quiz.subject, quiz.topic),
-          questionByQuestionReview: reviewData,
-        },
-      },
-    });
-  };
-
-  // Add this effect after your other useEffects
-  useEffect(() => {
-    if (selectedSubject && selectedSubject !== 'all') {
-      const topicsForSubject = getTopicsForSubject(selectedSubject);
-      setTopicItems([
-        { label: 'All Topics', value: 'all' },
-        ...topicsForSubject.map(topic => ({
-          label: topic.name,
-          value: topic.id,
-        })),
-      ]);
-    } else {
-      // If "All Subjects" is selected
-      setTopicItems([{ label: 'All Topics', value: 'all' }]);
-    }
-  }, [selectedSubject]);
-
-  // And these effects to handle dropdown conflicts
-  useEffect(() => {
-    if (subjectOpen) {
-      setTopicOpen(false);
-    }
-  }, [subjectOpen]);
-
-  useEffect(() => {
-    if (topicOpen) {
-      setSubjectOpen(false);
-    }
-  }, [topicOpen]);
-
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
@@ -1027,39 +978,39 @@ const QuizScreen = ({ navigation, route }) => {
             ? quizType === 'ai'
               ? 'Create AI Quiz'
               : 'Create PYQ Test'
-            : quiz?.title || 'Quiz'
+            : quiz?.topicName || 'Quiz'
         }
         navigation={navigation}
         onBack={() => {
-          if (!setupMode) {
-            // Replace confirm with Alert
+          if (setupMode) {
+            navigation.goBack();
+          } else {
             Alert.alert(
               'Exit Quiz',
-              'Are you sure you want to exit the quiz? All progress will be lost.',
+              'Are you sure you want to exit this quiz? Your progress will be lost.',
               [
-                {
-                  text: 'Cancel',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Exit',
-                  onPress: () => {
-                    if (timerRef.current) {
-                      clearInterval(timerRef.current);
-                    }
-                    navigation.goBack();
-                  },
-                  style: 'destructive',
-                },
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Exit', onPress: () => navigation.goBack() },
               ],
             );
-          } else {
-            navigation.goBack();
           }
         }}
       />
 
       {setupMode ? renderQuizSetup() : renderQuizContent()}
+
+      {apiError && (
+        <View
+          style={[
+            styles.errorContainer,
+            { backgroundColor: `${theme.error}20` },
+          ]}
+        >
+          <Text style={[styles.errorText, { color: theme.error }]}>
+            {apiError}
+          </Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -1460,6 +1411,24 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+  },
+  errorContainer: {
+    padding: 10,
+    margin: 16,
+    borderRadius: 8,
+  },
+  errorText: {
+    textAlign: 'center',
   },
 });
 

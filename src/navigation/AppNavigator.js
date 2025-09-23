@@ -28,6 +28,7 @@ import YouTubePlaylistScreen from '../screens/YouTubePlaylistScreen';
 import YouTubeVideoListScreen from '../screens/YouTubeVideoListScreen';
 import YouTubePlayerScreen from '../screens/YouTubePlayerScreen';
 import AddResourceScreen from '../screens/AddResourceScreen';
+import QuizHistoryScreen from '../screens/QuizHistoryScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -108,6 +109,7 @@ const HomeStackScreen = () => (
     <HomeStack.Screen name="Timer" component={TimerScreen} />
     <HomeStack.Screen name="AiGuide" component={AiGuideScreen} />
     <HomeStack.Screen name="AddResource" component={AddResourceScreen} />
+    <HomeStack.Screen name="QuizHistory" component={QuizHistoryScreen} />
   </HomeStack.Navigator>
 );
 
@@ -168,6 +170,7 @@ const MoreStackScreen = () => (
     <MoreStack.Screen name="SubjectDetail" component={SubjectDetailScreen} />
     <MoreStack.Screen name="Quiz" component={QuizScreen} />
     <MoreStack.Screen name="QuizResult" component={QuizResultScreen} />
+    <MoreStack.Screen name="QuizHistory" component={QuizHistoryScreen} />
     <MoreStack.Screen name="Settings" component={SettingsScreen} />
     <MoreStack.Screen name="Analytics" component={AnalyticsScreen} />
     <MoreStack.Screen name="Resources" component={ResourcesScreen} />

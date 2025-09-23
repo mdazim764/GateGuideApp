@@ -10,9 +10,10 @@ const BASE_URL = __DEV__
 
 console.log('Connecting to API at:', BASE_URL);
 
+// Create an axios instance with a longer timeout
 const apiClient = axios.create({
   baseURL: BASE_URL,
-  timeout: 30000, // 30 seconds timeout
+  timeout: 120000, // Increase timeout to 120 seconds for quiz generation
   headers: {
     'Content-Type': 'application/json',
   },
@@ -261,6 +262,8 @@ const api = {
     submitQuiz: (id, answers) =>
       apiClient.post(`/quizzes/${id}/submit`, answers),
     getAttempts: () => apiClient.get('/quizzes/attempts/all'),
+    getAttemptDetail: attemptId =>
+      apiClient.get(`/quizzes/attempts/${attemptId}`),
   },
 
   resources: {
@@ -349,5 +352,31 @@ const api = {
     getById: quoteId => apiClient.get(`/ai/quotes/${quoteId}`),
   },
 };
+
+// Add retry interceptor to handle network issues
+
+// Add this after creating your apiClient instance
+apiClient.interceptors.response.use(undefined, async (error) => {
+  const { config, message } = error;
+  
+  // Check if error is a network error or a timeout
+  if (message === 'Network Error' || error.code === 'ECONNABORTED') {
+    // Don't retry if we already tried 3 times
+    if (config._retry >= 2) {
+      return Promise.reject(error);
+    }
+    
+    // Set retry count
+    config._retry = (config._retry || 0) + 1;
+    
+    // Wait for 1 second before retrying
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Retry the request
+    return apiClient(config);
+  }
+  
+  return Promise.reject(error);
+});
 
 export default api;
