@@ -321,6 +321,16 @@ const api = {
     approveResource: (id, data) =>
       apiClient.put(`/admin/resources/${id}`, data),
   },
+
+  // Add quotes API endpoints
+  quotes: {
+    getAll: (page = 1, limit = 20) =>
+      apiClient.get(`/ai/quotes?page=${page}&limit=${limit}`),
+    getDaily: () => apiClient.get('/ai/quotes/daily'),
+    getRandom: () => apiClient.get('/ai/quotes/random'),
+    getPersonalized: () => apiClient.get('/ai/quotes/personalized'),
+    getById: quoteId => apiClient.get(`/ai/quotes/${quoteId}`),
+  },
 };
 
 export default api;

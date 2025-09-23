@@ -37,6 +37,8 @@ const defaultTheme = {
 const HomeScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
   const { user } = useAuth();
+  // Extract the quote functions at the component level
+  const { fetchDailyQuote, fetchRandomQuote: appFetchRandomQuote } = useApp();
 
   // States for data
   const [dashboardData, setDashboardData] = useState(null);
@@ -94,53 +96,63 @@ const HomeScreen = ({ navigation }) => {
     author: 'Abigail Adams',
   });
 
-  // Replace setRandomQuote function with this one that fetches from API
+  // Replace the fetchRandomQuote function with this:
   const fetchRandomQuote = async () => {
     try {
       setQuoteLoading(true);
-      const response = await api.quotes.getRandomQuote();
 
-      // Check the response structure and format accordingly
-      if (response.data && response.data.quote) {
-        // If the API returns { quote: "...", author: "..." }
-        setCurrentQuote(response.data);
-      } else if (response.data && response.data.text) {
-        // If the API returns { text: "...", author: "..." }
-        setCurrentQuote(response.data);
-      } else {
-        // Fallback to a default quote if the structure is unexpected
-        setCurrentQuote({
-          text: 'Education is the passport to the future, for tomorrow belongs to those who prepare for it today.',
-          author: 'Malcolm X',
-        });
+      // First try to get the personalized quote
+      try {
+        const response = await api.quotes.getPersonalized();
+        if (response.data) {
+          setCurrentQuote(response.data);
+        }
+      } catch (personalizedError) {
+        // Fall back to daily quote
+        try {
+          const response = await api.quotes.getDaily();
+          if (response.data) {
+            setCurrentQuote(response.data);
+          }
+        } catch (dailyError) {
+          // Finally fall back to random quote
+          try {
+            const response = await api.quotes.getRandom();
+            if (response.data) {
+              setCurrentQuote(response.data);
+            }
+          } catch (randomError) {
+            // If all API calls fail, fall back to static quotes
+            console.log('Falling back to static quotes:', randomError);
+            const staticQuotes = [
+              {
+                text: 'The expert in anything was once a beginner.',
+                author: 'Helen Hayes',
+              },
+              {
+                text: 'The beautiful thing about learning is that no one can take it away from you.',
+                author: 'B.B. King',
+              },
+              {
+                text: 'Education is the passport to the future.',
+                author: 'Malcolm X',
+              },
+              {
+                text: 'The more that you read, the more things you will know.',
+                author: 'Dr. Seuss',
+              },
+              {
+                text: 'The only way to do great work is to love what you do.',
+                author: 'Steve Jobs',
+              },
+            ];
+            const randomIndex = Math.floor(Math.random() * staticQuotes.length);
+            setCurrentQuote(staticQuotes[randomIndex]);
+          }
+        }
       }
     } catch (error) {
       console.log('Error fetching quote:', error);
-      // Fallback to static quotes on error
-      const staticQuotes = [
-        {
-          text: 'The expert in anything was once a beginner.',
-          author: 'Helen Hayes',
-        },
-        {
-          text: 'The beautiful thing about learning is that no one can take it away from you.',
-          author: 'B.B. King',
-        },
-        {
-          text: 'Education is the passport to the future.',
-          author: 'Malcolm X',
-        },
-        {
-          text: 'The more that you read, the more things you will know.',
-          author: 'Dr. Seuss',
-        },
-        {
-          text: 'The only way to do great work is to love what you do.',
-          author: 'Steve Jobs',
-        },
-      ];
-      const randomIndex = Math.floor(Math.random() * staticQuotes.length);
-      setCurrentQuote(staticQuotes[randomIndex]);
     } finally {
       setQuoteLoading(false);
     }
@@ -615,7 +627,48 @@ const HomeScreen = ({ navigation }) => {
                   <ActivityIndicator size="small" color={theme.primary} />
                 </View>
               ) : (
-                <QuoteCard quote={currentQuote} />
+                <View
+                  style={[styles.quoteCard, { backgroundColor: theme.card }]}
+                >
+                  {currentQuote.type && (
+                    <View style={styles.quoteTypeContainer}>
+                      <Text
+                        style={[
+                          styles.quoteType,
+                          {
+                            backgroundColor: getTypeColor(
+                              currentQuote.type,
+                              theme,
+                            ),
+                            color: '#FFFFFF',
+                            fontSize: 10,
+                            paddingHorizontal: 6,
+                            paddingVertical: 2,
+                            borderRadius: 10,
+                            overflow: 'hidden',
+                          },
+                        ]}
+                      >
+                        {currentQuote.type?.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text style={[styles.quoteText, { color: theme.text }]}>
+                    "{currentQuote.text}"
+                  </Text>
+                  <Text style={[styles.quoteAuthor, { color: theme.primary }]}>
+                    - {currentQuote.author}
+                  </Text>
+
+                  <TouchableOpacity
+                    style={styles.viewMoreButton}
+                    onPress={() => navigation.navigate('Quotes')}
+                  >
+                    <Text style={{ color: theme.primary }}>
+                      View more quotes
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </Animated.View>
           </>
@@ -623,6 +676,22 @@ const HomeScreen = ({ navigation }) => {
       </ScrollView>
     </SafeAreaView>
   );
+};
+
+// Helper function to determine tag color based on quote type
+const getTypeColor = (type, theme) => {
+  if (!type) return theme.textSecondary + '80';
+
+  switch (type.toLowerCase()) {
+    case 'daily':
+      return theme.success + 'CC';
+    case 'personalized':
+      return theme.primary + 'CC';
+    case 'random':
+      return theme.accent + 'CC';
+    default:
+      return theme.textSecondary + '80';
+  }
 };
 
 const styles = StyleSheet.create({
@@ -822,6 +891,36 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     height: 100,
+  },
+  quoteCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginVertical: 8,
+  },
+  quoteTypeContainer: {
+    marginBottom: 8,
+  },
+  quoteType: {
+    backgroundColor: '#E3F2FD',
+    color: '#2196F3',
+    fontSize: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  quoteText: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  quoteAuthor: {
+    fontSize: 14,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  viewMoreButton: {
+    marginTop: 12,
+    alignSelf: 'flex-start',
   },
 });
 

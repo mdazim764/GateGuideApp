@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../services/api';
 
 // Create context
 const AppContext = createContext();
@@ -8,8 +9,10 @@ const AppContext = createContext();
 export const AppProvider = ({ children }) => {
   // App state
   const [progress, setProgress] = useState({});
-  const [quotes, setQuotes] = useState([]);
   const [currentQuote, setCurrentQuote] = useState(null);
+  const [quotes, setQuotes] = useState([]);
+  const [loadingQuotes, setLoadingQuotes] = useState(false);
+  const [quoteError, setQuoteError] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Load data from storage on app start
@@ -92,6 +95,77 @@ export const AppProvider = ({ children }) => {
     }
   };
 
+  // Fetch daily quote from API
+  const fetchDailyQuote = async () => {
+    try {
+      setLoadingQuotes(true);
+      setQuoteError(null);
+      const response = await api.quotes.getDaily();
+      if (response.data) {
+        setCurrentQuote(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching daily quote:', error);
+      setQuoteError('Could not load daily quote');
+    } finally {
+      setLoadingQuotes(false);
+    }
+  };
+
+  // Fetch random quote from API
+  const fetchRandomQuote = async () => {
+    try {
+      setLoadingQuotes(true);
+      setQuoteError(null);
+      const response = await api.quotes.getRandom();
+      if (response.data) {
+        setCurrentQuote(response.data);
+      }
+    } catch (error) {
+      console.error('Error fetching random quote:', error);
+      setQuoteError('Could not load random quote');
+    } finally {
+      setLoadingQuotes(false);
+    }
+  };
+
+  // Fetch all quotes from API
+  const fetchAllQuotes = async (page = 1, limit = 20) => {
+    try {
+      setLoadingQuotes(true);
+      setQuoteError(null);
+      const response = await api.quotes.getAll(page, limit);
+      if (response.data && response.data.quotes) {
+        setQuotes(response.data.quotes);
+        // If no current quote is set, use the first one
+        if (!currentQuote && response.data.quotes.length > 0) {
+          setCurrentQuote(response.data.quotes[0]);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching quotes:', error);
+      setQuoteError('Could not load quotes');
+    } finally {
+      setLoadingQuotes(false);
+    }
+  };
+
+  // Renamed from setRandomQuoteOfDay to reflect API usage
+  const refreshCurrentQuote = () => {
+    // Try to get a personalized quote first, fall back to random if error
+    api.quotes
+      .getPersonalized()
+      .then(response => {
+        if (response.data) {
+          setCurrentQuote(response.data);
+        }
+      })
+      .catch(error => {
+        console.log('Falling back to random quote:', error);
+        fetchRandomQuote();
+      });
+  };
+
   // Update progress
   const updateProgress = async (subjectId, topicId, status) => {
     try {
@@ -116,7 +190,12 @@ export const AppProvider = ({ children }) => {
     updateProgress,
     quotes,
     currentQuote,
-    setRandomQuoteOfDay,
+    loadingQuotes,
+    quoteError,
+    fetchDailyQuote,
+    fetchRandomQuote,
+    fetchAllQuotes,
+    refreshCurrentQuote, // renamed from setRandomQuoteOfDay
     isLoading,
   };
 
