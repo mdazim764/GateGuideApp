@@ -11,6 +11,7 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import { ThemeContext } from '../theme/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommonActions } from '@react-navigation/native';
+import { lightTheme } from '../theme/colors';
 
 const CustomHeader = ({
   title,
@@ -25,6 +26,9 @@ const CustomHeader = ({
 }) => {
   const { theme } = useContext(ThemeContext);
   const insets = useSafeAreaInsets();
+
+  const statusBarStyle = theme.dark ? 'light-content' : 'dark-content';
+  const statusBarBg = theme.primary;
 
   // Improved route history detection - handles nested navigators better
   const getRouteHistory = () => {
@@ -172,11 +176,29 @@ const CustomHeader = ({
         },
       ]}
     >
-      <StatusBar
-        backgroundColor={transparent ? 'transparent' : theme.card}
-        barStyle={theme.dark ? 'light-content' : 'dark-content'}
-        translucent={true}
-      />
+      {theme.background === '#121212' && Platform.OS === 'android'
+        ? (console.log(
+            'Rendering dark mode status bar for Android',
+            theme.background,
+          ),
+          (
+            <StatusBar
+              backgroundColor={'#BB86FC'}
+              barStyle={'light-content'}
+              translucent={true}
+            />
+          ))
+        : (console.log(
+            'Rendering light mode status bar for Android',
+            theme.background,
+          ),
+          (
+            <StatusBar
+              backgroundColor={'#FFFFFF'}
+              barStyle={'dark-content'}
+              // translucent={true}
+            />
+          ))}
 
       <View style={styles.header}>
         {/* Left/back button with improved touch area */}

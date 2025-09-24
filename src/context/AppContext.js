@@ -101,6 +101,7 @@ export const AppProvider = ({ children }) => {
       setLoadingQuotes(true);
       setQuoteError(null);
       const response = await api.quotes.getDaily();
+      console.log('Daily quote response:', response);
       if (response.data) {
         setCurrentQuote(response.data);
       }
@@ -119,6 +120,7 @@ export const AppProvider = ({ children }) => {
       setQuoteError(null);
       const response = await api.quotes.getRandom();
       if (response.data) {
+        console.log('Random quote response:', response);
         setCurrentQuote(response.data);
       }
     } catch (error) {
@@ -139,6 +141,10 @@ export const AppProvider = ({ children }) => {
         setQuotes(response.data.quotes);
         // If no current quote is set, use the first one
         if (!currentQuote && response.data.quotes.length > 0) {
+          console.log(
+            'Setting current quote from all quotes:',
+            response.data.quotes[0],
+          );
           setCurrentQuote(response.data.quotes[0]);
         }
       }
@@ -157,6 +163,7 @@ export const AppProvider = ({ children }) => {
       .getPersonalized()
       .then(response => {
         if (response.data) {
+          console.log('Personalized quote response:', response);
           setCurrentQuote(response.data);
         }
       })

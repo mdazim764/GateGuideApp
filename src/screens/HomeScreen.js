@@ -12,6 +12,7 @@ import {
   Image,
   Easing,
   Platform,
+  StatusBar,
   SafeAreaView as RNSafeAreaView, // Fallback
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -33,6 +34,35 @@ const defaultTheme = {
   primary: '#007AFF',
   card: '#F5F5F5',
 };
+
+// Import static quotes for fallback
+const staticQuotes = [
+  {
+    text: 'The expert in anything was once a beginner.',
+    author: 'Helen Hayes',
+    type: 'motivation',
+  },
+  {
+    text: 'The beautiful thing about learning is that no one can take it away from you.',
+    author: 'B.B. King',
+    type: 'education',
+  },
+  {
+    text: 'Education is the passport to the future.',
+    author: 'Malcolm X',
+    type: 'education',
+  },
+  {
+    text: 'The more that you read, the more things you will know.',
+    author: 'Dr. Seuss',
+    type: 'learning',
+  },
+  {
+    text: 'The only way to do great work is to love what you do.',
+    author: 'Steve Jobs',
+    type: 'motivation',
+  },
+];
 
 const HomeScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
@@ -57,6 +87,9 @@ const HomeScreen = ({ navigation }) => {
 
   // Add loading state for quotes
   const [quoteLoading, setQuoteLoading] = useState(false);
+
+  // Add a flag to track if we've already loaded the daily quote
+  const [dailyQuoteLoaded, setDailyQuoteLoaded] = useState(false);
 
   // Calculate remaining days until deadline (Feb 1, 2026)
   const calculateRemainingDays = () => {
@@ -94,65 +127,61 @@ const HomeScreen = ({ navigation }) => {
   const [currentQuote, setCurrentQuote] = useState({
     text: 'Learning is not attained by chance, it must be sought for with ardor and diligence.',
     author: 'Abigail Adams',
+    type: 'daily',
   });
 
-  // Replace the fetchRandomQuote function with this:
-  const fetchRandomQuote = async () => {
+  // Improved fetchQuote function that prioritizes daily quote from database
+  const fetchQuote = async (forceRefresh = false) => {
     try {
+      // If we've already loaded the daily quote and don't need to refresh, skip API call
+      if (dailyQuoteLoaded && !forceRefresh) {
+        return;
+      }
+
       setQuoteLoading(true);
 
-      // First try to get the personalized quote
+      // First try to get the daily quote
       try {
-        const response = await api.quotes.getPersonalized();
+        const response = await api.quotes.getToday();
         if (response.data) {
-          setCurrentQuote(response.data);
+          setCurrentQuote({
+            ...response.data,
+            type: response.data.type || 'daily',
+          });
+          console.log('Daily quote response:', response);
+          setDailyQuoteLoaded(true);
+          return;
         }
-      } catch (personalizedError) {
-        // Fall back to daily quote
+      } catch (dailyError) {
+        console.log('Error fetching daily quote:', dailyError);
+
+        // Fall back to personalized quote
         try {
-          const response = await api.quotes.getDaily();
+          const response = await api.quotes.getPersonalized();
           if (response.data) {
-            setCurrentQuote(response.data);
+            setCurrentQuote({
+              ...response.data,
+              type: response.data.type || 'personalized',
+            });
+            console.log('Personalized quote response:', response);
+            setDailyQuoteLoaded(true);
+            return;
           }
-        } catch (dailyError) {
-          // Finally fall back to random quote
-          try {
-            const response = await api.quotes.getRandom();
-            if (response.data) {
-              setCurrentQuote(response.data);
-            }
-          } catch (randomError) {
-            // If all API calls fail, fall back to static quotes
-            console.log('Falling back to static quotes:', randomError);
-            const staticQuotes = [
-              {
-                text: 'The expert in anything was once a beginner.',
-                author: 'Helen Hayes',
-              },
-              {
-                text: 'The beautiful thing about learning is that no one can take it away from you.',
-                author: 'B.B. King',
-              },
-              {
-                text: 'Education is the passport to the future.',
-                author: 'Malcolm X',
-              },
-              {
-                text: 'The more that you read, the more things you will know.',
-                author: 'Dr. Seuss',
-              },
-              {
-                text: 'The only way to do great work is to love what you do.',
-                author: 'Steve Jobs',
-              },
-            ];
-            const randomIndex = Math.floor(Math.random() * staticQuotes.length);
-            setCurrentQuote(staticQuotes[randomIndex]);
-          }
+        } catch (personalizedError) {
+          console.log('Error fetching personalized quote:', personalizedError);
+
+          // Finally fall back to static quotes
+          const randomIndex = Math.floor(Math.random() * staticQuotes.length);
+          setCurrentQuote(staticQuotes[randomIndex]);
+          setDailyQuoteLoaded(true);
         }
       }
     } catch (error) {
       console.log('Error fetching quote:', error);
+
+      // Final fallback to static quotes if all else fails
+      const randomIndex = Math.floor(Math.random() * staticQuotes.length);
+      setCurrentQuote(staticQuotes[randomIndex]);
     } finally {
       setQuoteLoading(false);
     }
@@ -223,13 +252,14 @@ const HomeScreen = ({ navigation }) => {
 
   // Load data on component mount
   useEffect(() => {
-    fetchRandomQuote();
+    fetchQuote(false); // Get quote without forcing refresh
     loadDashboardData();
   }, []);
 
   // Pull-to-refresh handler
   const handleRefresh = () => {
     loadDashboardData(true);
+    // Don't refresh quote on pull-to-refresh
   };
 
   if (loading && !refreshing) {
@@ -246,6 +276,29 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      {theme.background === '#121212' && Platform.OS === 'android'
+        ? (console.log(
+            'Rendering dark mode status bar for Android',
+            theme.background,
+          ),
+          (
+            <StatusBar
+              backgroundColor={'#BB86FC'}
+              barStyle={'light-content'}
+              translucent={true}
+            />
+          ))
+        : (console.log(
+            'Rendering light mode status bar for Android',
+            theme.background,
+          ),
+          (
+            <StatusBar
+              backgroundColor={'#FFFFFF'}
+              barStyle={'dark-content'}
+              // translucent={true}
+            />
+          ))}
       <Animated.View
         style={[
           styles.header,
@@ -609,11 +662,10 @@ const HomeScreen = ({ navigation }) => {
                   Daily Inspiration
                 </Text>
                 <TouchableOpacity
-                  onPress={fetchRandomQuote}
-                  disabled={quoteLoading}
+                  onPress={() => navigation.navigate('Quotes')}
                   style={styles.refreshQuoteButton}
                 >
-                  <Icon name="refresh" size={20} color={theme.primary} />
+                  <Icon name="arrow-right" size={20} color={theme.primary} />
                 </TouchableOpacity>
               </View>
 
@@ -636,11 +688,9 @@ const HomeScreen = ({ navigation }) => {
                         style={[
                           styles.quoteType,
                           {
-                            backgroundColor: getTypeColor(
-                              currentQuote.type,
-                              theme,
-                            ),
+                            backgroundColor: theme.primary + '20',
                             color: '#FFFFFF',
+                            width: 'auto',
                             fontSize: 10,
                             paddingHorizontal: 6,
                             paddingVertical: 2,
@@ -678,7 +728,7 @@ const HomeScreen = ({ navigation }) => {
   );
 };
 
-// Helper function to determine tag color based on quote type
+// Helper function for determining quote tag color
 const getTypeColor = (type, theme) => {
   if (!type) return theme.textSecondary + '80';
 
@@ -687,6 +737,12 @@ const getTypeColor = (type, theme) => {
       return theme.success + 'CC';
     case 'personalized':
       return theme.primary + 'CC';
+    case 'motivation':
+      return '#FF9800CC';
+    case 'education':
+      return '#2196F3CC';
+    case 'learning':
+      return '#9C27B0CC';
     case 'random':
       return theme.accent + 'CC';
     default:

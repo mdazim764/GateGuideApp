@@ -163,6 +163,10 @@ const api = {
       apiClient.get('/analytics/subject-performance'),
     getStudyHours: timeframe =>
       apiClient.get(`/analytics/study-hours?timeframe=${timeframe}`),
+    getAnalytics: (period = 'week') =>
+      apiClient.get(`/analytics?period=${period}`),
+    exportAnalyticsData: (period = 'week', format = 'json') =>
+      apiClient.get(`/analytics/export?period=${period}&format=${format}`),
   },
 
   // UPDATED: Academic endpoints with new routes
@@ -347,6 +351,7 @@ const api = {
     getAll: (page = 1, limit = 20) =>
       apiClient.get(`/ai/quotes?page=${page}&limit=${limit}`),
     getDaily: () => apiClient.get('/ai/quotes/daily'),
+    getToday: () => apiClient.get('/ai/quotes/today'),
     getRandom: () => apiClient.get('/ai/quotes/random'),
     getPersonalized: () => apiClient.get('/ai/quotes/personalized'),
     getById: quoteId => apiClient.get(`/ai/quotes/${quoteId}`),
@@ -356,26 +361,26 @@ const api = {
 // Add retry interceptor to handle network issues
 
 // Add this after creating your apiClient instance
-apiClient.interceptors.response.use(undefined, async (error) => {
+apiClient.interceptors.response.use(undefined, async error => {
   const { config, message } = error;
-  
+
   // Check if error is a network error or a timeout
   if (message === 'Network Error' || error.code === 'ECONNABORTED') {
     // Don't retry if we already tried 3 times
     if (config._retry >= 2) {
       return Promise.reject(error);
     }
-    
+
     // Set retry count
     config._retry = (config._retry || 0) + 1;
-    
+
     // Wait for 1 second before retrying
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     // Retry the request
     return apiClient(config);
   }
-  
+
   return Promise.reject(error);
 });
 

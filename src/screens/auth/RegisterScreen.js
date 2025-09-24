@@ -9,33 +9,109 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
-  ActivityIndicator
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeContext } from '../../theme/ThemeContext';
+import { useAuth } from '../../context/AuthContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const RegisterScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
+  const { register, login, error: authError } = useAuth();
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  // Email validation
+  const isValidEmail = email => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Form validation
+  const validateForm = () => {
+    setError('');
+
+    if (!name.trim()) {
+      setError('Name is required');
+      return false;
+    }
+
+    if (!email.trim()) {
+      setError('Email is required');
+      return false;
+    }
+
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address');
+      return false;
+    }
+
+    if (!password) {
+      setError('Password is required');
+      return false;
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long');
+      return false;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return false;
+    }
+
+    return true;
+  };
 
   const handleRegister = async () => {
-    if (password !== confirmPassword) {
-      // Show error
+    // First validate the form
+    if (!validateForm()) {
       return;
     }
-    
-    setLoading(true);
-    // Mock registration - would connect to backend later
-    setTimeout(() => {
+
+    try {
+      setLoading(true);
+      setError('');
+
+      // Call the register function from AuthContext
+      const success = await register(name, email, password);
+
+      if (success) {
+        console.log('Registration successful, attempting login');
+
+        // Auto-login after successful registration
+        const loginSuccess = await login(email, password);
+
+        if (loginSuccess) {
+          console.log('Auto-login successful');
+          // navigation.replace('Main');
+        } else {
+          console.log('Auto-login failed, redirecting to login');
+          Alert.alert(
+            'Registration Successful',
+            'Your account has been created! Please log in.',
+            [{ text: 'OK', onPress: () => navigation.navigate('Login') }],
+          );
+        }
+      } else {
+        // If the register function returned false, show the error
+        setError(authError || 'Registration failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Registration error:', err);
+      setError('An unexpected error occurred. Please try again later.');
+    } finally {
       setLoading(false);
-      navigation.replace('Main');
-    }, 1500);
+    }
   };
 
   const styles = StyleSheet.create({
@@ -121,6 +197,11 @@ const RegisterScreen = ({ navigation }) => {
       fontWeight: '500',
       marginLeft: 4,
     },
+    errorText: {
+      color: theme.error || '#ff3333',
+      marginTop: 10,
+      textAlign: 'center',
+    },
   });
 
   return (
@@ -132,8 +213,13 @@ const RegisterScreen = ({ navigation }) => {
         <ScrollView contentContainerStyle={styles.scrollContent}>
           <View style={styles.header}>
             <Text style={styles.title}>Create Account</Text>
-            <Text style={styles.subtitle}>Sign up to start your GATE preparation journey</Text>
+            <Text style={styles.subtitle}>
+              Sign up to start your GATE preparation journey
+            </Text>
           </View>
+
+          {/* Display error message if any */}
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           <View style={styles.inputContainer}>
             <Text style={styles.inputLabel}>Full Name</Text>
@@ -143,6 +229,7 @@ const RegisterScreen = ({ navigation }) => {
               placeholderTextColor={`${theme.text}50`}
               value={name}
               onChangeText={setName}
+              autoCapitalize="words"
             />
           </View>
 
@@ -170,14 +257,14 @@ const RegisterScreen = ({ navigation }) => {
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
               />
-              <TouchableOpacity 
+              <TouchableOpacity
                 style={styles.eyeIcon}
                 onPress={() => setShowPassword(!showPassword)}
               >
-                <Icon 
-                  name={showPassword ? 'eye-off' : 'eye'} 
-                  size={24} 
-                  color={theme.text} 
+                <Icon
+                  name={showPassword ? 'eye-off' : 'eye'}
+                  size={24}
+                  color={theme.text}
                 />
               </TouchableOpacity>
             </View>
@@ -197,8 +284,8 @@ const RegisterScreen = ({ navigation }) => {
             </View>
           </View>
 
-          <TouchableOpacity 
-            style={styles.registerButton}
+          <TouchableOpacity
+            style={[styles.registerButton, { opacity: loading ? 0.7 : 1 }]}
             onPress={handleRegister}
             disabled={loading}
           >

@@ -13,9 +13,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeContext } from '../theme/ThemeContext';
+import { useAuth } from '../context/AuthContext'; // Changed to useAuth hook
+import { useNavigation } from '@react-navigation/native';
 
 const SettingsScreen = () => {
+  const navigation = useNavigation();
   const { theme, isDarkMode, toggleTheme } = useContext(ThemeContext);
+  const { logout, isLoggedIn } = useAuth(); // Use the useAuth hook instead
   const [notifications, setNotifications] = useState(true);
   const [remindTime, setRemindTime] = useState('08:00');
 
@@ -79,6 +83,18 @@ const SettingsScreen = () => {
       color: '#E53935',
       fontWeight: 'bold',
       fontSize: 16,
+    },
+    logoutButton: {
+      padding: 16,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    logoutButtonText: {
+      color: '#E53935',
+      fontWeight: 'bold',
+      fontSize: 16,
+      marginLeft: 8,
     },
   });
 
@@ -164,6 +180,47 @@ const SettingsScreen = () => {
     Linking.openURL('https://gateguideapp.com');
   };
 
+  const handleLogout = () => {
+    Alert.alert('Logout', 'Are you sure you want to logout?', [
+      {
+        text: 'Cancel',
+        style: 'cancel',
+      },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await logout();
+            // Check your actual auth navigation stack name
+            // If you use a Stack.Navigator with name="AuthStack" in your AppNavigator:
+            // navigation.reset({
+            //   index: 0,
+            //   routes: [{ name: 'Login' }], // Change to your actual auth entry screen name
+            // });
+          } catch (error) {
+            console.error('Error during logout:', error);
+            Alert.alert('Error', 'Failed to logout. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
+
+  // Render the logout button only if user is logged in
+  const renderLogoutButton = () => {
+    if (!isLoggedIn) return null;
+
+    return (
+      <View style={[styles.section, { backgroundColor: theme.card }]}>
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+          <Icon name="logout" size={20} color="#E53935" />
+          <Text style={styles.logoutButtonText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
@@ -172,12 +229,22 @@ const SettingsScreen = () => {
         <Text style={[styles.title, { color: theme.text }]}>Settings</Text>
 
         <View style={[styles.section, { backgroundColor: theme.card }]}>
-          <Text style={[styles.sectionTitle, { color: theme.text, borderBottomColor: theme.border }]}>Appearance</Text>
-          
-          <View style={[styles.settingItem, { borderBottomColor: theme.border }]}
->
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: theme.text, borderBottomColor: theme.border },
+            ]}
+          >
+            Appearance
+          </Text>
+
+          <View
+            style={[styles.settingItem, { borderBottomColor: theme.border }]}
+          >
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: theme.text }]}>Dark Mode</Text>
+              <Text style={[styles.settingTitle, { color: theme.text }]}>
+                Dark Mode
+              </Text>
               <Text style={[styles.settingDescription, { color: theme.text }]}>
                 Switch between light and dark theme
               </Text>
@@ -191,14 +258,23 @@ const SettingsScreen = () => {
           </View>
         </View>
 
-        <View style={[styles.section, { backgroundColor: theme.card }]}
->
-          <Text style={[styles.sectionTitle, { color: theme.text, borderBottomColor: theme.border }]}>Notifications</Text>
-          
-          <View style={[styles.settingItem, { borderBottomColor: theme.border }]}
->
+        <View style={[styles.section, { backgroundColor: theme.card }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: theme.text, borderBottomColor: theme.border },
+            ]}
+          >
+            Notifications
+          </Text>
+
+          <View
+            style={[styles.settingItem, { borderBottomColor: theme.border }]}
+          >
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: theme.text }]}>Enable Notifications</Text>
+              <Text style={[styles.settingTitle, { color: theme.text }]}>
+                Enable Notifications
+              </Text>
               <Text style={[styles.settingDescription, { color: theme.text }]}>
                 Receive daily study reminders
               </Text>
@@ -210,67 +286,89 @@ const SettingsScreen = () => {
               thumbColor={'#f4f3f4'}
             />
           </View>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[
-              styles.settingItem, 
-              { opacity: notifications ? 1 : 0.5, borderBottomColor: theme.border }
+              styles.settingItem,
+              {
+                opacity: notifications ? 1 : 0.5,
+                borderBottomColor: theme.border,
+              },
             ]}
             onPress={selectRemindTime}
-            disabled={!notifications}>
+            disabled={!notifications}
+          >
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: theme.text }]}>Reminder Time</Text>
+              <Text style={[styles.settingTitle, { color: theme.text }]}>
+                Reminder Time
+              </Text>
               <Text style={[styles.settingDescription, { color: theme.text }]}>
                 Set when to receive daily reminders
               </Text>
             </View>
             <View style={styles.settingValue}>
-              <Text style={[styles.settingValueText, { color: theme.primary }]}>{remindTime}</Text>
+              <Text style={[styles.settingValueText, { color: theme.primary }]}>
+                {remindTime}
+              </Text>
               <Icon name="chevron-right" size={20} color={theme.primary} />
             </View>
           </TouchableOpacity>
         </View>
 
-        <View style={[styles.section, { backgroundColor: theme.card }]}
->
-          <Text style={[styles.sectionTitle, { color: theme.text, borderBottomColor: theme.border }]}>About</Text>
-          
-          <TouchableOpacity 
-            style={[styles.settingItem, { borderBottomColor: theme.border }]
-}
-            onPress={visitWebsite}>
+        <View style={[styles.section, { backgroundColor: theme.card }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              { color: theme.text, borderBottomColor: theme.border },
+            ]}
+          >
+            About
+          </Text>
+
+          <TouchableOpacity
+            style={[styles.settingItem, { borderBottomColor: theme.border }]}
+            onPress={visitWebsite}
+          >
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: theme.text }]}>Visit Website</Text>
+              <Text style={[styles.settingTitle, { color: theme.text }]}>
+                Visit Website
+              </Text>
             </View>
             <Icon name="open-in-new" size={20} color={theme.primary} />
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={[styles.settingItem, { borderBottomColor: theme.border }]
-}
-            onPress={contactSupport}>
+
+          <TouchableOpacity
+            style={[styles.settingItem, { borderBottomColor: theme.border }]}
+            onPress={contactSupport}
+          >
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: theme.text }]}>Contact Support</Text>
+              <Text style={[styles.settingTitle, { color: theme.text }]}>
+                Contact Support
+              </Text>
             </View>
             <Icon name="email-outline" size={20} color={theme.primary} />
           </TouchableOpacity>
-          
+
           <View style={styles.settingItem}>
             <View style={styles.settingInfo}>
-              <Text style={[styles.settingTitle, { color: theme.text }]}>Version</Text>
+              <Text style={[styles.settingTitle, { color: theme.text }]}>
+                Version
+              </Text>
             </View>
-            <Text style={[styles.versionText, { color: theme.text }]}>1.0.0</Text>
+            <Text style={[styles.versionText, { color: theme.text }]}>
+              1.0.0
+            </Text>
           </View>
         </View>
 
-        <View style={[styles.section, { backgroundColor: theme.card }]}
->
-          <TouchableOpacity 
-            style={styles.dangerButton}
-            onPress={clearAllData}>
+        <View style={[styles.section, { backgroundColor: theme.card }]}>
+          <TouchableOpacity style={styles.dangerButton} onPress={clearAllData}>
             <Text style={styles.dangerButtonText}>Clear App Data</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Logout Section */}
+        {renderLogoutButton()}
       </ScrollView>
     </SafeAreaView>
   );

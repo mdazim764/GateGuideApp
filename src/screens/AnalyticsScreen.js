@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,10 +7,16 @@ import {
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  ActivityIndicator,
+  Alert,
+  Share,
+  Platform,
 } from 'react-native';
 import { ThemeContext } from '../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CustomHeader from '../components/CustomHeader';
+import api from '../services/api';
+import * as FileSystem from 'react-native-fs';
 
 const { width } = Dimensions.get('window');
 
@@ -41,81 +47,158 @@ const ChartBar = ({ value, maxValue, label, color, theme }) => {
 const AnalyticsScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
   const [selectedTimeframe, setSelectedTimeframe] = useState('week'); // 'week', 'month', 'year'
+  const [analyticsData, setAnalyticsData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
 
-  // Mock data
-  const studyData = {
-    week: {
-      totalHours: 18,
-      daysActive: 5,
-      quizzesTaken: 8,
-      averageScore: 72,
-      dailyStudy: [
-        { day: 'Mon', hours: 3 },
-        { day: 'Tue', hours: 4.5 },
-        { day: 'Wed', hours: 2 },
-        { day: 'Thu', hours: 3.5 },
-        { day: 'Fri', hours: 1 },
-        { day: 'Sat', hours: 4 },
-        { day: 'Sun', hours: 0 },
-      ],
-      subjectBreakdown: [
-        { subject: 'OS', percentage: 30 },
-        { subject: 'DBMS', percentage: 25 },
-        { subject: 'CN', percentage: 20 },
-        { subject: 'DS', percentage: 15 },
-        { subject: 'Others', percentage: 10 },
-      ],
-    },
-    month: {
-      totalHours: 64,
-      daysActive: 22,
-      quizzesTaken: 24,
-      averageScore: 76,
-      dailyStudy: [
-        { day: 'Week 1', hours: 18 },
-        { day: 'Week 2', hours: 14 },
-        { day: 'Week 3', hours: 20 },
-        { day: 'Week 4', hours: 12 },
-      ],
-      subjectBreakdown: [
-        { subject: 'OS', percentage: 28 },
-        { subject: 'DBMS', percentage: 22 },
-        { subject: 'CN', percentage: 25 },
-        { subject: 'DS', percentage: 18 },
-        { subject: 'Others', percentage: 7 },
-      ],
-    },
-    year: {
-      totalHours: 720,
-      daysActive: 240,
-      quizzesTaken: 104,
-      averageScore: 82,
-      dailyStudy: [
-        { day: 'Jan', hours: 50 },
-        { day: 'Feb', hours: 65 },
-        { day: 'Mar', hours: 55 },
-        { day: 'Apr', hours: 48 },
-        { day: 'May', hours: 60 },
-        { day: 'Jun', hours: 70 },
-        { day: 'Jul', hours: 72 },
-        { day: 'Aug', hours: 68 },
-        { day: 'Sep', hours: 65 },
-        { day: 'Oct', hours: 60 },
-        { day: 'Nov', hours: 55 },
-        { day: 'Dec', hours: 52 },
-      ],
-      subjectBreakdown: [
-        { subject: 'OS', percentage: 25 },
-        { subject: 'DBMS', percentage: 20 },
-        { subject: 'CN', percentage: 22 },
-        { subject: 'DS', percentage: 18 },
-        { subject: 'Others', percentage: 15 },
-      ],
-    },
+  // Fetch analytics data whenever timeframe changes
+  useEffect(() => {
+    fetchAnalytics();
+  }, [selectedTimeframe]);
+
+  const fetchAnalytics = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await api.analytics.getAnalytics(selectedTimeframe);
+
+      console.log('Analytics data:', response.data);
+      setAnalyticsData(response.data);
+    } catch (error) {
+      console.error('Error fetching analytics:', error);
+      setError('Failed to load analytics data. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const data = studyData[selectedTimeframe];
-  const maxStudyHours = Math.max(...data.dailyStudy.map(item => item.hours));
+  const handleExportData = async () => {
+    try {
+      setExportLoading(true);
+
+      // Call the export API
+      const response = await api.analytics.exportAnalyticsData(
+        selectedTimeframe,
+        'json',
+      );
+
+      // Share the data
+      const exportData = JSON.stringify(response.data, null, 2);
+
+      if (Platform.OS === 'ios') {
+        // On iOS, directly share the JSON data
+        await Share.share({
+          title: `GATE Guide Analytics - ${
+            selectedTimeframe.charAt(0).toUpperCase() +
+            selectedTimeframe.slice(1)
+          }`,
+          message: exportData,
+        });
+      } else {
+        // On Android, save to file then share
+        const path = `${
+          FileSystem.CachesDirectoryPath
+        }/gate_analytics_${selectedTimeframe}_${Date.now()}.json`;
+        await FileSystem.writeFile(path, exportData, 'utf8');
+
+        await Share.share({
+          title: `GATE Guide Analytics - ${
+            selectedTimeframe.charAt(0).toUpperCase() +
+            selectedTimeframe.slice(1)
+          }`,
+          url: `file://${path}`,
+        });
+      }
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      Alert.alert(
+        'Export Failed',
+        'Unable to export analytics data. Please try again.',
+      );
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
+        <CustomHeader
+          title="Analytics"
+          navigation={navigation}
+          onBack={() => navigation.goBack()}
+        />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.text }]}>
+            Loading analytics data...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
+        <CustomHeader
+          title="Analytics"
+          navigation={navigation}
+          onBack={() => navigation.goBack()}
+        />
+        <View style={styles.errorContainer}>
+          <Icon name="alert-circle-outline" size={64} color={theme.error} />
+          <Text style={[styles.errorText, { color: theme.error }]}>
+            {error}
+          </Text>
+          <TouchableOpacity
+            style={[styles.retryButton, { backgroundColor: theme.primary }]}
+            onPress={fetchAnalytics}
+          >
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // If no data is available yet
+  if (!analyticsData) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: theme.background }]}
+      >
+        <CustomHeader
+          title="Analytics"
+          navigation={navigation}
+          onBack={() => navigation.goBack()}
+        />
+        <View style={styles.noDataContainer}>
+          <Icon
+            name="chart-timeline-variant"
+            size={64}
+            color={`${theme.text}40`}
+          />
+          <Text style={[styles.noDataText, { color: theme.textSecondary }]}>
+            No analytics data available for this period
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Extract data from API response
+  const { summaryMetrics, studyTimeDistribution, subjectBreakdown, insights } =
+    analyticsData;
+
+  // Calculate max study hours for the chart
+  const maxStudyHours = Math.max(...(studyTimeDistribution?.data || [0]));
 
   return (
     <SafeAreaView
@@ -125,8 +208,6 @@ const AnalyticsScreen = ({ navigation }) => {
         title="Analytics"
         navigation={navigation}
         onBack={() => navigation.goBack()}
-        // rightIcon="export-variant"
-        // onRightPress={() => {}}
       />
       <ScrollView
         style={styles.scrollView}
@@ -173,8 +254,12 @@ const AnalyticsScreen = ({ navigation }) => {
             >
               <Icon name="clock-outline" size={24} color={theme.primary} />
             </View>
-            <Text style={styles.statValue}>{data.totalHours}</Text>
-            <Text style={styles.statLabel}>Hours Studied</Text>
+            <Text style={[styles.statValue, { color: theme.text }]}>
+              {summaryMetrics?.hoursStudied || 0}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+              Hours Studied
+            </Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: theme.card }]}>
             <View
@@ -185,8 +270,12 @@ const AnalyticsScreen = ({ navigation }) => {
             >
               <Icon name="calendar-check" size={24} color={theme.primary} />
             </View>
-            <Text style={styles.statValue}>{data.daysActive}</Text>
-            <Text style={styles.statLabel}>Days Active</Text>
+            <Text style={[styles.statValue, { color: theme.text }]}>
+              {summaryMetrics?.daysActive || 0}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+              Days Active
+            </Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: theme.card }]}>
             <View
@@ -197,8 +286,12 @@ const AnalyticsScreen = ({ navigation }) => {
             >
               <Icon name="notebook-check" size={24} color={theme.primary} />
             </View>
-            <Text style={styles.statValue}>{data.quizzesTaken}</Text>
-            <Text style={styles.statLabel}>Quizzes Taken</Text>
+            <Text style={[styles.statValue, { color: theme.text }]}>
+              {summaryMetrics?.quizzesTaken || 0}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+              Quizzes Taken
+            </Text>
           </View>
           <View style={[styles.statCard, { backgroundColor: theme.card }]}>
             <View
@@ -209,8 +302,12 @@ const AnalyticsScreen = ({ navigation }) => {
             >
               <Icon name="percent" size={24} color={theme.primary} />
             </View>
-            <Text style={styles.statValue}>{data.averageScore}%</Text>
-            <Text style={styles.statLabel}>Average Score</Text>
+            <Text style={[styles.statValue, { color: theme.text }]}>
+              {summaryMetrics?.averageScore || 0}%
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+              Average Score
+            </Text>
           </View>
         </View>
 
@@ -228,12 +325,12 @@ const AnalyticsScreen = ({ navigation }) => {
             style={[styles.chartContainer, { backgroundColor: theme.card }]}
           >
             <View style={styles.barChart}>
-              {data.dailyStudy.map((item, index) => (
+              {studyTimeDistribution?.labels?.map((label, index) => (
                 <ChartBar
                   key={index}
-                  value={item.hours}
-                  maxValue={maxStudyHours}
-                  label={item.day}
+                  value={studyTimeDistribution.data[index] || 0}
+                  maxValue={maxStudyHours || 1}
+                  label={label}
                   color={theme.primary}
                   theme={theme}
                 />
@@ -255,25 +352,27 @@ const AnalyticsScreen = ({ navigation }) => {
           <View
             style={[styles.subjectBreakdown, { backgroundColor: theme.card }]}
           >
-            {data.subjectBreakdown.map((item, index) => (
-              <View key={index} style={styles.subjectItem}>
+            {subjectBreakdown?.map((item, index) => (
+              <View key={item.id} style={styles.subjectItem}>
                 <View style={styles.subjectInfo}>
                   <View
                     style={[
                       styles.subjectColorDot,
                       {
-                        backgroundColor: [
-                          theme.primary,
-                          '#FF9800',
-                          '#4CAF50',
-                          '#2196F3',
-                          '#9C27B0',
-                        ][index % 5],
+                        backgroundColor:
+                          item.color ||
+                          [
+                            theme.primary,
+                            '#FF9800',
+                            '#4CAF50',
+                            '#2196F3',
+                            '#9C27B0',
+                          ][index % 5],
                       },
                     ]}
                   />
                   <Text style={[styles.subjectName, { color: theme.text }]}>
-                    {item.subject}
+                    {item.name}
                   </Text>
                 </View>
                 <View style={styles.subjectPercentageContainer}>
@@ -287,13 +386,15 @@ const AnalyticsScreen = ({ navigation }) => {
                       style={[
                         styles.subjectPercentageFill,
                         {
-                          backgroundColor: [
-                            theme.primary,
-                            '#FF9800',
-                            '#4CAF50',
-                            '#2196F3',
-                            '#9C27B0',
-                          ][index % 5],
+                          backgroundColor:
+                            item.color ||
+                            [
+                              theme.primary,
+                              '#FF9800',
+                              '#4CAF50',
+                              '#2196F3',
+                              '#9C27B0',
+                            ][index % 5],
                           width: `${item.percentage}%`,
                         },
                       ]}
@@ -326,36 +427,72 @@ const AnalyticsScreen = ({ navigation }) => {
           <View
             style={[styles.insightsContainer, { backgroundColor: theme.card }]}
           >
-            <View style={styles.insightItem}>
-              <Icon name="trending-up" size={24} color="#4CAF50" />
-              <Text style={[styles.insightText, { color: theme.text }]}>
-                Your study time increased by 12% compared to last{' '}
-                {selectedTimeframe}.
-              </Text>
-            </View>
-            <View style={styles.insightItem}>
-              <Icon name="star" size={24} color="#FFC107" />
-              <Text style={[styles.insightText, { color: theme.text }]}>
-                Your strongest subject is Operating Systems with 85% quiz score.
-              </Text>
-            </View>
-            <View style={styles.insightItem}>
-              <Icon name="alert" size={24} color="#FF5722" />
-              <Text style={[styles.insightText, { color: theme.text }]}>
-                Computer Networks needs more attention with only 65% quiz score.
-              </Text>
-            </View>
+            {insights?.map((insight, index) => (
+              <View key={index} style={styles.insightItem}>
+                <Icon
+                  name={
+                    insight.icon ||
+                    (insight.type === 'strength'
+                      ? 'trending-up'
+                      : insight.type === 'warning'
+                      ? 'alert'
+                      : 'information')
+                  }
+                  size={24}
+                  color={
+                    insight.type === 'strength'
+                      ? '#4CAF50'
+                      : insight.type === 'warning'
+                      ? '#FF5722'
+                      : '#FFC107'
+                  }
+                />
+                <Text style={[styles.insightText, { color: theme.text }]}>
+                  {insight.message}
+                </Text>
+              </View>
+            ))}
+
+            {(!insights || insights.length === 0) && (
+              <View style={styles.insightItem}>
+                <Icon name="information" size={24} color="#2196F3" />
+                <Text style={[styles.insightText, { color: theme.text }]}>
+                  Continue studying to generate personalized insights.
+                </Text>
+              </View>
+            )}
           </View>
         </View>
 
         {/* Export Button */}
         <TouchableOpacity
-          style={[styles.exportButton, { backgroundColor: theme.primary }]}
-          onPress={() => {
-            // Export logic here
-          }}
+          style={[
+            styles.exportButton,
+            {
+              backgroundColor: exportLoading
+                ? `${theme.primary}80`
+                : theme.primary,
+            },
+          ]}
+          onPress={handleExportData}
+          disabled={exportLoading}
         >
-          <Text style={styles.exportButtonText}>Export Data</Text>
+          {exportLoading ? (
+            <View style={styles.buttonInnerContainer}>
+              <ActivityIndicator color="#fff" size="small" />
+              <Text style={styles.exportButtonText}>Exporting...</Text>
+            </View>
+          ) : (
+            <View style={styles.buttonInnerContainer}>
+              <Icon
+                name="export"
+                size={20}
+                color="#fff"
+                style={styles.exportIcon}
+              />
+              <Text style={styles.exportButtonText}>Export Data</Text>
+            </View>
+          )}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -459,11 +596,11 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 4,
     minHeight: 120,
+    justifyContent: 'space-around',
   },
   chartBarContainer: {
     width: 32,
     alignItems: 'center',
-    marginRight: 12,
   },
   barLabelContainer: {
     position: 'absolute',
@@ -577,6 +714,56 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  buttonInnerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  exportIcon: {
+    marginRight: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    marginTop: 16,
+    marginBottom: 24,
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  retryButton: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  noDataContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  noDataText: {
+    marginTop: 16,
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
 

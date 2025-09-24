@@ -15,7 +15,7 @@ const MoreScreen = ({ navigation }) => {
 
   const menuItems = [
     { name: 'Planner', screen: 'Planner', icon: 'calendar-outline' },
-    { name: 'Quotes', screen: 'Quotes', icon: 'quote-outline' },
+    { name: 'Quotes', screen: 'Quotes', icon: 'flame-outline' },
     { name: 'Tracker', screen: 'Tracker', icon: 'stats-chart-outline' },
     {
       name: 'AI Guide',
@@ -24,7 +24,6 @@ const MoreScreen = ({ navigation }) => {
     },
     { name: 'Syllabus', screen: 'Syllabus', icon: 'list-outline' },
     { name: 'Timer', screen: 'Timer', icon: 'time-outline' },
-    { name: 'Subject Detail', screen: 'SubjectDetail', icon: 'book-outline' },
     { name: 'Quiz', screen: 'Quiz', icon: 'help-circle-outline' },
     {
       name: 'Quiz History',
