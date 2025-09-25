@@ -1,11 +1,19 @@
 import React, { useEffect, useContext } from 'react';
-import { StatusBar, Platform } from 'react-native';
+import { StatusBar, Platform, LogBox } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { AppProvider } from './src/context/AppContext';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider, ThemeContext } from './src/theme/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { testKeychain } from './src/utils/KeychainTest';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NotificationProvider } from './src/context/NotificationContext'; // Add this import
+
+LogBox.ignoreLogs([
+  'VirtualizedLists should never be nested',
+  'ViewPropTypes will be removed',
+  'ColorPropType will be removed',
+]);
 
 const App = () => {
   // const { theme } = useContext(ThemeContext);
@@ -38,16 +46,22 @@ const App = () => {
       : ['left', 'right', 'bottom', 'top']; // For older Android, include 'top'
 
   return (
-    <NavigationContainer>
-      <ThemeProvider>
-        <AuthProvider>
-          <AppProvider>
-            {/* <StatusBar backgroundColor="#6a51ae" barStyle="light-content" /> */}
-            <AppNavigator />
-          </AppProvider>
-        </AuthProvider>
-      </ThemeProvider>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <ThemeProvider>
+          <AuthProvider>
+            <AppProvider>
+              <NotificationProvider>
+                {/* Add this wrapper */}
+                <StatusBar barStyle="dark-content" />
+                <AppNavigator />
+              </NotificationProvider>
+              {/* End wrapper */}
+            </AppProvider>
+          </AuthProvider>
+        </ThemeProvider>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 };
 

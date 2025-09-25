@@ -1,0 +1,4 @@
+<resources>
+    <color name="primary">#000000</color>  <!-- You can change this hex code to your app's primary color -->
+    <color name="white">#FFFFFF</color>
+</resources>

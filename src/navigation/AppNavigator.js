@@ -29,6 +29,9 @@ import YouTubeVideoListScreen from '../screens/YouTubeVideoListScreen';
 import YouTubePlayerScreen from '../screens/YouTubePlayerScreen';
 import AddResourceScreen from '../screens/AddResourceScreen';
 import QuizHistoryScreen from '../screens/QuizHistoryScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
+import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
+import NotificationBadge from '../components/NotificationBadge';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -52,6 +55,8 @@ const MainTabNavigator = () => {
             iconName = focused ? 'chart-line' : 'chart-line-variant';
           } else if (route.name === 'MoreTab') {
             iconName = focused ? 'dots-horizontal' : 'dots-horizontal';
+          } else if (route.name === 'NotificationsTab') {
+            iconName = focused ? 'bell' : 'bell-outline';
           }
 
           return <Icon name={iconName} size={size} color={color} />;
@@ -82,6 +87,24 @@ const MainTabNavigator = () => {
         component={TrackerStackScreen}
         options={{ tabBarLabel: 'Tracker' }}
       />
+
+      <Tab.Screen
+        name="NotificationsTab"
+        component={NotificationsStackNavigator}
+        options={{
+          tabBarLabel: 'Notifications',
+          tabBarIcon: ({ color, size }) => (
+            <View>
+              <Icon name="bell-outline" size={size} color={color} />
+              <NotificationBadge
+                size="small"
+                containerStyle={{ position: 'absolute', top: -5, right: -5 }}
+              />
+            </View>
+          ),
+        }}
+      />
+
       <Tab.Screen
         name="MoreTab"
         component={MoreStackScreen}
@@ -110,6 +133,11 @@ const HomeStackScreen = () => (
     <HomeStack.Screen name="AiGuide" component={AiGuideScreen} />
     <HomeStack.Screen name="AddResource" component={AddResourceScreen} />
     <HomeStack.Screen name="QuizHistory" component={QuizHistoryScreen} />
+    <HomeStack.Screen name="Notifications" component={NotificationsScreen} />
+    <HomeStack.Screen
+      name="NotificationSettings"
+      component={NotificationSettingsScreen}
+    />
   </HomeStack.Navigator>
 );
 
@@ -175,6 +203,7 @@ const MoreStackScreen = () => (
     <MoreStack.Screen name="Analytics" component={AnalyticsScreen} />
     <MoreStack.Screen name="Resources" component={ResourcesScreen} />
     <MoreStack.Screen name="AddResource" component={AddResourceScreen} />
+    <MoreStack.Screen name="Notifications" component={NotificationsScreen} />
     <MoreStack.Screen
       name="YouTubePlaylist"
       component={YouTubePlaylistScreen}
@@ -185,6 +214,20 @@ const MoreStackScreen = () => (
     />
     <MoreStack.Screen name="YouTubePlayer" component={YouTubePlayerScreen} />
   </MoreStack.Navigator>
+);
+
+const NotificationsStack = createStackNavigator();
+const NotificationsStackNavigator = () => (
+  <NotificationsStack.Navigator screenOptions={{ headerShown: false }}>
+    <NotificationsStack.Screen
+      name="Notifications"
+      component={NotificationsScreen}
+    />
+    <NotificationsStack.Screen
+      name="NotificationSettings"
+      component={NotificationSettingsScreen}
+    />
+  </NotificationsStack.Navigator>
 );
 
 // Authentication navigator
@@ -222,6 +265,11 @@ const AppNavigator = () => {
       ) : (
         <Stack.Screen name="Auth" component={AuthStack} />
       )}
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen
+        name="NotificationSettings"
+        component={NotificationSettingsScreen}
+      />
     </Stack.Navigator>
   );
 };

@@ -356,6 +356,60 @@ const api = {
     getPersonalized: () => apiClient.get('/ai/quotes/personalized'),
     getById: quoteId => apiClient.get(`/ai/quotes/${quoteId}`),
   },
+
+  notifications: {
+    // Update FCM token
+    updateFcmToken: fcmToken => {
+      console.log('API: Updating FCM token...');
+      return apiClient.put('/notifications/token', { fcmToken });
+    },
+
+    // Get user notifications with pagination
+    getNotifications: (page = 1, limit = 10) => {
+      console.log(
+        `API: Getting notifications (page: ${page}, limit: ${limit})...`,
+      );
+      return apiClient.get(`/notifications?page=${page}&limit=${limit}`);
+    },
+
+    // Mark notifications as read
+    markRead: notificationIds => {
+      console.log('API: Marking notifications as read:', notificationIds);
+      return apiClient.patch('/notifications/read', { ids: notificationIds });
+    },
+
+    // Delete specific notifications
+    deleteNotifications: notificationIds => {
+      console.log('API: Deleting notifications:', notificationIds);
+      return apiClient.delete('/notifications', {
+        data: { ids: notificationIds },
+      });
+    },
+
+    // Clear all notifications
+    clearAllNotifications: () => {
+      console.log('API: Clearing all notifications...');
+      return apiClient.delete('/notifications/all');
+    },
+
+    // Get notification preferences
+    getPreferences: () => {
+      console.log('API: Getting notification preferences...');
+      return apiClient.get('/notifications/preferences');
+    },
+
+    // Update notification preferences
+    updatePreferences: preferences => {
+      console.log('API: Updating notification preferences:', preferences);
+      return apiClient.put('/notifications/preferences', preferences);
+    },
+
+    // Send test notification
+    sendTestNotification: () => {
+      console.log('API: Sending test notification...');
+      return apiClient.post('/notifications/test');
+    },
+  },
 };
 
 // Add retry interceptor to handle network issues

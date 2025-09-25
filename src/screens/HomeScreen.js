@@ -21,9 +21,11 @@ import { ThemeContext } from '../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
+import { useNotification } from '../context/NotificationContext'; // Add this import
 
 // Import your components
 import QuoteCard from '../components/quotes/QuoteCard';
+import NotificationBadge from '../components/NotificationBadge'; // Add this import
 
 const { width } = Dimensions.get('window');
 
@@ -67,6 +69,7 @@ const staticQuotes = [
 const HomeScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
   const { user } = useAuth();
+  const { unreadCount } = useNotification(); // Add this line
   // Extract the quote functions at the component level
   const { fetchDailyQuote, fetchRandomQuote: appFetchRandomQuote } = useApp();
 
@@ -321,12 +324,30 @@ const HomeScreen = ({ navigation }) => {
             })}
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.settingsButton}
-          onPress={() => navigation.navigate('MoreTab', { screen: 'Settings' })}
-        >
-          <Icon name="cog" size={24} color={theme.text} />
-        </TouchableOpacity>
+
+        {/* Add notification and settings buttons */}
+        <View style={styles.headerButtons}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate('Notifications')}
+          >
+            <Icon name="bell-outline" size={24} color={theme.text} />
+            <NotificationBadge
+              count={unreadCount}
+              size="small"
+              containerStyle={{ position: 'absolute', top: 0, right: 0 }}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() =>
+              navigation.navigate('MoreTab', { screen: 'Settings' })
+            }
+          >
+            <Icon name="cog" size={24} color={theme.text} />
+          </TouchableOpacity>
+        </View>
       </Animated.View>
 
       <ScrollView
@@ -977,6 +998,14 @@ const styles = StyleSheet.create({
   viewMoreButton: {
     marginTop: 12,
     alignSelf: 'flex-start',
+  },
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
+    padding: 8,
+    position: 'relative',
   },
 });
 
