@@ -22,7 +22,10 @@ const QuizResultScreen = ({ navigation, route }) => {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [subjects, setSubjects] = useState([]); // Add subjects state
-
+  const correctCount =
+    Math.floor((result.score / 100) * result.totalQuestions) || 0;
+  const incorrectCount =
+    result.feedback?.incorrectCount || result.totalQuestions - correctCount;
   // Add function to fetch subjects
   const fetchSubjects = async () => {
     try {
@@ -85,9 +88,7 @@ const QuizResultScreen = ({ navigation, route }) => {
 
   if (loading) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.background }]}
-      >
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <CustomHeader title="Quiz Result" navigation={navigation} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
@@ -95,15 +96,13 @@ const QuizResultScreen = ({ navigation, route }) => {
             Loading quiz result...
           </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   if (error || !result) {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.background }]}
-      >
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <CustomHeader title="Quiz Result" navigation={navigation} />
         <View style={styles.errorContainer}>
           <Icon name="alert-circle-outline" size={48} color={theme.error} />
@@ -117,7 +116,7 @@ const QuizResultScreen = ({ navigation, route }) => {
             <Text style={styles.buttonText}>Back to Home</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -129,13 +128,11 @@ const QuizResultScreen = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <CustomHeader
         title="Quiz Result"
         navigation={navigation}
-        onBack={() => navigation.navigate('Home')}
+        onBack={() => navigation.goBack()}
       />
 
       <ScrollView style={styles.scrollView}>
@@ -191,7 +188,7 @@ const QuizResultScreen = ({ navigation, route }) => {
             <View style={styles.statItem}>
               <Icon name="check" size={20} color={theme.primary} />
               <Text style={[styles.statText, { color: theme.text }]}>
-                {result.correctAnswers} / {result.totalQuestions} correct
+                {correctCount} / {result.totalQuestions} correct
               </Text>
             </View>
             <View style={styles.statItem}>
@@ -243,7 +240,7 @@ const QuizResultScreen = ({ navigation, route }) => {
               </View>
 
               <Text style={[styles.reviewQuestion, { color: theme.text }]}>
-                {review.question}
+                {result.questions[index]?.text || 'Question text not available'}
               </Text>
 
               <View style={styles.answerContainer}>
@@ -320,7 +317,7 @@ const QuizResultScreen = ({ navigation, route }) => {
           </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

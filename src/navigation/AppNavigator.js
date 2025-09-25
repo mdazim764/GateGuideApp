@@ -1,11 +1,13 @@
-import React, { useContext } from 'react';
+import React, { useContext, useEffect } from 'react';
 import { ActivityIndicator, View } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createStackNavigator } from '@react-navigation/stack';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 import { useAuth } from '../context/AuthContext';
 import { ThemeContext } from '../theme/ThemeContext';
+import { useNotification } from '../context/NotificationContext';
 
 // Import screens
 import HomeScreen from '../screens/HomeScreen';
@@ -39,6 +41,8 @@ const Stack = createStackNavigator();
 // Define MainTabNavigator that was referenced but missing
 const MainTabNavigator = () => {
   const { theme } = useContext(ThemeContext);
+  const { unreadCount } = useNotification();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({

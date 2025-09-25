@@ -547,9 +547,7 @@ const TrackerScreen = ({ navigation, route }) => {
   // Update the topic detail view to match SubjectDetailScreen's subtopic handling
   if (selectedTopic && selectedTab === 'syllabus') {
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.background }]}
-      >
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <CustomHeader
           title={selectedTopic.name}
           navigation={navigation}
@@ -645,7 +643,7 @@ const TrackerScreen = ({ navigation, route }) => {
             );
           }}
         />
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -687,9 +685,7 @@ const TrackerScreen = ({ navigation, route }) => {
   if (selectedSubject && selectedTab === 'syllabus') {
     return (
       <>
-        <SafeAreaView
-          style={[styles.container, { backgroundColor: theme.background }]}
-        >
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
           <CustomHeader
             title={selectedSubject.name}
             navigation={navigation}
@@ -849,7 +845,7 @@ const TrackerScreen = ({ navigation, route }) => {
               </View>
             }
           />
-        </SafeAreaView>
+        </View>
       </>
     );
   }
@@ -868,9 +864,7 @@ const TrackerScreen = ({ navigation, route }) => {
       );
 
       return (
-        <SafeAreaView
-          style={[styles.container, { backgroundColor: theme.background }]}
-        >
+        <View style={[styles.container, { backgroundColor: theme.background }]}>
           <CustomHeader
             title={`${subject.name} - ${selectedYear} PYQs`}
             navigation={navigation}
@@ -1041,15 +1035,13 @@ const TrackerScreen = ({ navigation, route }) => {
             )}
             contentContainerStyle={[styles.list, { paddingBottom: 24 }]}
           />
-        </SafeAreaView>
+        </View>
       );
     }
 
     // Subject years list view
     return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: theme.background }]}
-      >
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <CustomHeader
           title={`${subject.name} PYQs`}
           navigation={navigation}
@@ -1193,7 +1185,7 @@ const TrackerScreen = ({ navigation, route }) => {
             </Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -1229,9 +1221,7 @@ const TrackerScreen = ({ navigation, route }) => {
 
   // --- Main Tracker Screen ---
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <CustomHeader
         title="Study Progress Tracker"
         navigation={navigation}
@@ -1908,7 +1898,7 @@ const TrackerScreen = ({ navigation, route }) => {
           </View>
         )}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 

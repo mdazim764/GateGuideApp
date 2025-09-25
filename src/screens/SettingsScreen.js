@@ -15,11 +15,14 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeContext } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext'; // Changed to useAuth hook
 import { useNavigation } from '@react-navigation/native';
+import NotificationScheduler from '../services/NotificationScheduler';
+import { useNotification } from '../context/NotificationContext';
 
 const SettingsScreen = () => {
   const navigation = useNavigation();
   const { theme, isDarkMode, toggleTheme } = useContext(ThemeContext);
   const { logout, isLoggedIn } = useAuth(); // Use the useAuth hook instead
+  const { preferences, updateNotificationPreferences } = useNotification();
   const [notifications, setNotifications] = useState(true);
   const [remindTime, setRemindTime] = useState('08:00');
 
@@ -205,6 +208,23 @@ const SettingsScreen = () => {
         },
       },
     ]);
+  };
+
+  const handleNotificationPreferenceChange = async (key, value) => {
+    const newPreferences = { ...preferences, [key]: value };
+
+    try {
+      await updateNotificationPreferences(newPreferences);
+
+      // Schedule or cancel local notifications based on preferences
+      if (key === 'taskReminders' && value) {
+        await NotificationScheduler.scheduleDailyReminder('09:00');
+      } else if (key === 'streakReminders' && value) {
+        await NotificationScheduler.scheduleStreakReminder();
+      }
+    } catch (error) {
+      console.error('Error updating notification preferences:', error);
+    }
   };
 
   // Render the logout button only if user is logged in

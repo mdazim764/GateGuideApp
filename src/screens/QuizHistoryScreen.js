@@ -51,11 +51,11 @@ const QuizHistoryScreen = ({ navigation }) => {
   };
 
   // Function to handle re-taking a quiz
-  const handleRetakeQuiz = async (quizId) => {
+  const handleRetakeQuiz = async quizId => {
     try {
       setLoading(true);
       const response = await api.quizzes.getQuiz(quizId);
-      
+
       // Navigate to the quiz screen with the quiz data
       navigation.navigate('Quiz', {
         quizId: response.data.id,
@@ -63,18 +63,16 @@ const QuizHistoryScreen = ({ navigation }) => {
       });
     } catch (error) {
       console.error('Error retaking quiz:', error);
-      Alert.alert(
-        'Error',
-        'Failed to start the quiz. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to start the quiz. Please try again.', [
+        { text: 'OK' },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
   // Function to format date
-  const formatDate = (dateString) => {
+  const formatDate = dateString => {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
@@ -85,7 +83,7 @@ const QuizHistoryScreen = ({ navigation }) => {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
         <CustomHeader title="Quiz History" navigation={navigation} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
@@ -93,12 +91,12 @@ const QuizHistoryScreen = ({ navigation }) => {
             Loading quiz history...
           </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <CustomHeader title="Quiz History" navigation={navigation} />
 
       {error ? (
@@ -117,7 +115,7 @@ const QuizHistoryScreen = ({ navigation }) => {
       ) : (
         <FlatList
           data={attempts}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           refreshing={refreshing}
           onRefresh={onRefresh}
           contentContainerStyle={styles.listContent}
@@ -142,39 +140,50 @@ const QuizHistoryScreen = ({ navigation }) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[styles.attemptCard, { backgroundColor: theme.card }]}
-              onPress={() => navigation.navigate('QuizResult', { attemptId: item.id })}
+              onPress={() =>
+                navigation.navigate('QuizResult', { attemptId: item.id })
+              }
             >
               <View style={styles.attemptHeader}>
                 <View style={styles.attemptInfo}>
-                  <Text style={[styles.quizTitle, { color: theme.text }]} numberOfLines={1}>
+                  <Text
+                    style={[styles.quizTitle, { color: theme.text }]}
+                    numberOfLines={1}
+                  >
                     {item.quiz.topicName || 'Quiz'}
                   </Text>
-                  <Text style={[styles.quizDate, { color: theme.textSecondary }]}>
+                  <Text
+                    style={[styles.quizDate, { color: theme.textSecondary }]}
+                  >
                     {formatDate(item.createdAt)}
                   </Text>
                 </View>
-                <View style={[
-                  styles.scoreContainer,
-                  {
-                    backgroundColor:
-                      item.score >= 70
-                        ? `${theme.success}20`
-                        : item.score >= 40
-                        ? `${theme.warning}20`
-                        : `${theme.error}20`,
-                  },
-                ]}>
-                  <Text style={[
-                    styles.scoreText,
+                <View
+                  style={[
+                    styles.scoreContainer,
                     {
-                      color:
+                      backgroundColor:
                         item.score >= 70
-                          ? theme.success
+                          ? `${theme.success}20`
                           : item.score >= 40
-                          ? theme.warning
-                          : theme.error,
+                          ? `${theme.warning}20`
+                          : `${theme.error}20`,
                     },
-                  ]}>
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.scoreText,
+                      {
+                        color:
+                          item.score >= 70
+                            ? theme.success
+                            : item.score >= 40
+                            ? theme.warning
+                            : theme.error,
+                      },
+                    ]}
+                  >
                     {item.score}%
                   </Text>
                 </View>
@@ -183,34 +192,51 @@ const QuizHistoryScreen = ({ navigation }) => {
               <View style={styles.attemptStats}>
                 <View style={styles.statItem}>
                   <Icon name="check-circle" size={16} color={theme.primary} />
-                  <Text style={[styles.statText, { color: theme.textSecondary }]}>
+                  <Text
+                    style={[styles.statText, { color: theme.textSecondary }]}
+                  >
                     {item.correctCount}/{item.totalQuestions} correct
                   </Text>
                 </View>
                 <View style={styles.statItem}>
                   <Icon name="clock-outline" size={16} color={theme.primary} />
-                  <Text style={[styles.statText, { color: theme.textSecondary }]}>
-                    {Math.floor(item.timeTaken / 60)}:{(item.timeTaken % 60).toString().padStart(2, '0')}
+                  <Text
+                    style={[styles.statText, { color: theme.textSecondary }]}
+                  >
+                    {Math.floor(item.timeTaken / 60)}:
+                    {(item.timeTaken % 60).toString().padStart(2, '0')}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.actionButtons}>
                 <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: `${theme.primary}20` }]}
+                  style={[
+                    styles.actionButton,
+                    { backgroundColor: `${theme.primary}20` },
+                  ]}
                   onPress={() => handleRetakeQuiz(item.quiz.id)}
                 >
                   <Icon name="reload" size={16} color={theme.primary} />
-                  <Text style={[styles.actionButtonText, { color: theme.primary }]}>
+                  <Text
+                    style={[styles.actionButtonText, { color: theme.primary }]}
+                  >
                     Retake Quiz
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.actionButton, { backgroundColor: `${theme.text}10` }]}
-                  onPress={() => navigation.navigate('QuizResult', { attemptId: item.id })}
+                  style={[
+                    styles.actionButton,
+                    { backgroundColor: `${theme.text}10` },
+                  ]}
+                  onPress={() =>
+                    navigation.navigate('QuizResult', { attemptId: item.id })
+                  }
                 >
                   <Icon name="eye-outline" size={16} color={theme.text} />
-                  <Text style={[styles.actionButtonText, { color: theme.text }]}>
+                  <Text
+                    style={[styles.actionButtonText, { color: theme.text }]}
+                  >
                     View Results
                   </Text>
                 </TouchableOpacity>
@@ -219,7 +245,7 @@ const QuizHistoryScreen = ({ navigation }) => {
           )}
         />
       )}
-    </SafeAreaView>
+    </View>
   );
 };
 

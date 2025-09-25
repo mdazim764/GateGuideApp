@@ -8,6 +8,7 @@ import {
   Platform,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { ThemeContext } from '../theme/ThemeContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CommonActions } from '@react-navigation/native';
@@ -19,6 +20,8 @@ const CustomHeader = ({
   onBack,
   rightIcon,
   onRightPress,
+  rightIcon2,
+  onRightPress2,
   navigation,
   route,
   transparent = false,
@@ -243,6 +246,7 @@ const CustomHeader = ({
         </View>
 
         {/* Right button */}
+
         <TouchableOpacity
           onPress={onRightPress}
           style={styles.rightButton}
@@ -252,11 +256,29 @@ const CustomHeader = ({
           testID="header-right-button"
         >
           {rightIcon ? (
-            <Icon name={rightIcon} size={24} color={theme.text} />
+            <MaterialIcons name={rightIcon} size={24} color={theme.text} />
           ) : (
             <View style={styles.emptyIcon} />
           )}
         </TouchableOpacity>
+
+        {/* Right button 2 */}
+        {rightIcon2 && onRightPress2 && (
+          <TouchableOpacity
+            onPress={onRightPress2}
+            style={styles.rightButton}
+            disabled={!rightIcon2 || !onRightPress2}
+            accessibilityRole="button"
+            hitSlop={{ top: 15, bottom: 15, left: 15, right: 15 }}
+            testID="header-right-button-2"
+          >
+            {rightIcon2 ? (
+              <MaterialIcons name={rightIcon2} size={24} color={theme.text} />
+            ) : (
+              <View style={styles.emptyIcon} />
+            )}
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );
@@ -324,34 +346,3 @@ const styles = StyleSheet.create({
 });
 
 export default CustomHeader;
-
-// // Basic usage
-// <CustomHeader
-//   navigation={navigation}
-//   route={route}
-// />
-
-// // With subtitle
-// <CustomHeader
-//   title="Subject Details"
-//   subtitle="Computer Science"
-//   navigation={navigation}
-//   route={route}
-//   onBack={() => navigation.goBack()}
-// />
-
-// // With right button
-// <CustomHeader
-//   navigation={navigation}
-//   route={route}
-//   rightIcon="settings-outline"
-//   onRightPress={() => navigation.navigate('Settings')}
-// />
-
-// // Large title with transparent background (for image headers)
-// <CustomHeader
-//   navigation={navigation}
-//   route={route}
-//   transparent={true}
-//   largeTitle={true}
-// />

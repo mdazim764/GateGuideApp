@@ -15,6 +15,7 @@ const MoreScreen = ({ navigation }) => {
 
   const menuItems = [
     { name: 'Planner', screen: 'Planner', icon: 'calendar-outline' },
+    { name: 'Resources', screen: 'Resources', icon: 'play-circle-outline' },
     { name: 'Quotes', screen: 'Quotes', icon: 'flame-outline' },
     { name: 'Tracker', screen: 'Tracker', icon: 'stats-chart-outline' },
     {
@@ -30,9 +31,8 @@ const MoreScreen = ({ navigation }) => {
       screen: 'QuizHistory',
       icon: 'document-text-outline',
     },
-    { name: 'Settings', screen: 'Settings', icon: 'settings-outline' },
     { name: 'Analytics', screen: 'Analytics', icon: 'bar-chart-outline' },
-    { name: 'Resources', screen: 'Resources', icon: 'play-circle-outline' },
+    { name: 'Settings', screen: 'Settings', icon: 'settings-outline' },
   ];
 
   return (

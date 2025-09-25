@@ -8,6 +8,9 @@ export const lightTheme = {
   tabBar: '#FFFFFF',
   tabIcon: '#8A8A8A',
   tabIconFocused: '#6200ee',
+  success: '#4CAF50',
+  error: '#B00020',
+  warning: '#FFA000',
 };
 
 export const darkTheme = {
@@ -19,4 +22,7 @@ export const darkTheme = {
   tabBar: '#1E1E1E',
   tabIcon: '#8A8A8A',
   tabIconFocused: '#BB86FC',
+  success: '#4CAF50',
+  error: '#CF6679',
+  warning: '#FFA000',
 };

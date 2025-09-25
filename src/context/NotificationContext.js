@@ -1,6 +1,6 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import messaging from '@react-native-firebase/messaging';
-import { Platform, AppState, Alert, PermissionsAndroid } from 'react-native';
+import { Platform, AppState, Alert, PermissionsAndroid, Linking } from 'react-native';
 import PushNotification from 'react-native-push-notification';
 import PushNotificationIOS from '@react-native-community/push-notification-ios';
 import { useAuth } from './AuthContext';
@@ -11,9 +11,7 @@ const NotificationContext = createContext();
 export const useNotification = () => {
   const context = useContext(NotificationContext);
   if (!context) {
-    throw new Error(
-      'useNotification must be used within a NotificationProvider',
-    );
+    throw new Error('useNotification must be used within a NotificationProvider');
   }
   return context;
 };
@@ -32,7 +30,15 @@ export const NotificationProvider = ({ children }) => {
     streakReminders: true,
     weeklyReports: true,
   });
-  const isAuthenticated = isLoggedIn; // Alias for clarity
+  
+  // Navigation reference for deep linking
+  const navigationRef = useRef(null);
+  const isAuthenticated = isLoggedIn;
+
+  // Set navigation reference from the root navigator
+  const setNavigationRef = (ref) => {
+    navigationRef.current = ref;
+  };
 
   // Configure push notifications on component mount
   useEffect(() => {
@@ -42,48 +48,66 @@ export const NotificationProvider = ({ children }) => {
     };
   }, []);
 
-  // Configure push notifications
+  // Configure push notifications with enhanced channels
   const configurePushNotifications = () => {
-    // Configure for Android
     if (Platform.OS === 'android') {
-      PushNotification.createChannel(
+      // Create notification channels with different priorities
+      const channels = [
         {
-          channelId: 'default-channel-id',
-          channelName: 'Default Channel',
-          channelDescription: 'A default channel for notifications',
+          channelId: 'high-priority',
+          channelName: 'High Priority',
+          channelDescription: 'Important notifications that require immediate attention',
           playSound: true,
           soundName: 'default',
-          importance: 4,
+          importance: 4, // HIGH
           vibrate: true,
+          showBadge: true,
         },
-        created => console.log(`Channel created: ${created}`),
-      );
-
-      PushNotification.createChannel(
         {
-          channelId: 'reminders-channel-id',
-          channelName: 'Reminders',
-          channelDescription:
-            'Channel for reminders and scheduled notifications',
+          channelId: 'reminders',
+          channelName: 'Study Reminders',
+          channelDescription: 'Study session and task reminders',
           playSound: true,
           soundName: 'default',
-          importance: 3,
+          importance: 3, // DEFAULT
           vibrate: true,
+          showBadge: true,
         },
-        created => console.log(`Reminders channel created: ${created}`),
-      );
-
-      PushNotification.createChannel(
         {
-          channelId: 'quotes-channel-id',
+          channelId: 'quotes',
           channelName: 'Daily Quotes',
-          channelDescription: 'Channel for daily inspirational quotes',
+          channelDescription: 'Daily inspirational quotes',
           playSound: false,
-          importance: 2,
+          importance: 2, // LOW
           vibrate: false,
+          showBadge: false,
         },
-        created => console.log(`Quotes channel created: ${created}`),
-      );
+        {
+          channelId: 'progress',
+          channelName: 'Progress Updates',
+          channelDescription: 'Study progress and achievements',
+          playSound: true,
+          soundName: 'default',
+          importance: 3, // DEFAULT
+          vibrate: false,
+          showBadge: true,
+        },
+        {
+          channelId: 'social',
+          channelName: 'Social',
+          channelDescription: 'Community and social notifications',
+          playSound: false,
+          importance: 2, // LOW
+          vibrate: false,
+          showBadge: true,
+        }
+      ];
+
+      channels.forEach(channel => {
+        PushNotification.createChannel(channel, created => 
+          console.log(`Channel ${channel.channelId} created: ${created}`)
+        );
+      });
     }
 
     // Configure push notification handlers
@@ -103,6 +127,11 @@ export const NotificationProvider = ({ children }) => {
           handleNotificationOpen(notification);
         }
 
+        // Handle notification actions (if any)
+        if (notification.action) {
+          handleNotificationAction(notification);
+        }
+
         // Required on iOS only
         if (Platform.OS === 'ios') {
           notification.finish(PushNotificationIOS.FetchResult.NoData);
@@ -111,11 +140,11 @@ export const NotificationProvider = ({ children }) => {
 
       onAction: function (notification) {
         console.log('ACTION:', notification.action);
-        console.log('NOTIFICATION:', notification);
+        handleNotificationAction(notification);
       },
 
       onRegistrationError: function (err) {
-        console.error(err.message, err);
+        console.error('Registration error:', err);
       },
 
       permissions: {
@@ -135,7 +164,6 @@ export const NotificationProvider = ({ children }) => {
       try {
         console.log('Requesting FCM permissions...');
 
-        // Request permission
         const authStatus = await messaging().requestPermission();
         const enabled =
           authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
@@ -143,18 +171,17 @@ export const NotificationProvider = ({ children }) => {
 
         if (enabled) {
           console.log('Authorization status:', authStatus);
-
-          // Get FCM token
           const token = await messaging().getToken();
           console.log('FCM Token obtained:', token);
           setFcmToken(token);
 
-          // If user is authenticated, register token immediately
           if (isAuthenticated) {
             await registerTokenWithBackend(token);
           }
         } else {
           console.log('Notification permissions denied');
+          // Show alert to guide user to settings if needed
+          showPermissionDeniedAlert();
         }
       } catch (error) {
         console.error('Failed to get notification permission:', error);
@@ -163,11 +190,10 @@ export const NotificationProvider = ({ children }) => {
 
     requestPermissionAndToken();
 
-    // Listen for token refresh
     const unsubscribeTokenRefresh = messaging().onTokenRefresh(async token => {
       console.log('FCM token refreshed:', token);
       setFcmToken(token);
-      setTokenRegistered(false); // Reset registration status
+      setTokenRegistered(false);
 
       if (isAuthenticated) {
         await registerTokenWithBackend(token);
@@ -175,7 +201,28 @@ export const NotificationProvider = ({ children }) => {
     });
 
     return unsubscribeTokenRefresh;
-  }, []); // Remove isAuthenticated dependency to avoid multiple calls
+  }, []);
+
+  // Show permission denied alert with settings redirect
+  const showPermissionDeniedAlert = () => {
+    Alert.alert(
+      'Notifications Disabled',
+      'To receive study reminders and updates, please enable notifications in your device settings.',
+      [
+        { text: 'Later', style: 'cancel' },
+        {
+          text: 'Settings',
+          onPress: () => {
+            if (Platform.OS === 'ios') {
+              Linking.openURL('app-settings:');
+            } else {
+              Linking.openSettings();
+            }
+          },
+        },
+      ]
+    );
+  };
 
   // Register FCM token when user authenticates or token changes
   useEffect(() => {
@@ -196,11 +243,14 @@ export const NotificationProvider = ({ children }) => {
     const unsubscribe = messaging().onMessage(async remoteMessage => {
       console.log('Foreground notification received:', remoteMessage);
 
-      // Display the notification locally
-      showLocalNotification(remoteMessage);
+      // Show local notification with enhanced styling
+      showEnhancedLocalNotification(remoteMessage);
 
       // Refresh notifications list
       fetchNotifications();
+
+      // Handle in-app notification display (optional)
+      showInAppNotification(remoteMessage);
     });
 
     return unsubscribe;
@@ -208,142 +258,338 @@ export const NotificationProvider = ({ children }) => {
 
   // Set up background notification handlers
   useEffect(() => {
-    // Background state
     messaging().onNotificationOpenedApp(remoteMessage => {
-      console.log(
-        'Notification opened app from background state:',
-        remoteMessage,
-      );
+      console.log('Notification opened app from background state:', remoteMessage);
       handleNotificationOpen(remoteMessage);
     });
 
-    // Quit state
     messaging()
       .getInitialNotification()
       .then(remoteMessage => {
         if (remoteMessage) {
-          console.log(
-            'App opened from quit state by notification:',
-            remoteMessage,
-          );
+          console.log('App opened from quit state by notification:', remoteMessage);
           handleNotificationOpen(remoteMessage);
         }
       });
   }, []);
 
-  // Register FCM token with backend
-  const registerTokenWithBackend = async token => {
-    if (!token || !isAuthenticated) return;
-
-    try {
-      console.log(
-        'Registering FCM token with backend:',
-        token.substring(0, 20) + '...',
-      );
-
-      const response = await api.notifications.updateFcmToken(token);
-      console.log('FCM token registration response:', response.data);
-
-      setTokenRegistered(true);
-      console.log('FCM token registered with backend successfully');
-    } catch (error) {
-      console.error('Error registering FCM token with backend:', error);
-
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
-
-      setTokenRegistered(false);
-    }
-  };
-
-  // Show local notification for foreground messages
-  const showLocalNotification = remoteMessage => {
+  // Enhanced local notification display
+  const showEnhancedLocalNotification = (remoteMessage) => {
     const { notification, data } = remoteMessage;
-
     if (!notification) return;
 
-    // Determine channel based on notification type
-    let channelId = 'default-channel-id';
-    if (data && data.type) {
-      switch (data.type) {
-        case 'quote':
-          channelId = 'quotes-channel-id';
-          break;
-        case 'reminder':
-        case 'task':
-        case 'streak':
-          channelId = 'reminders-channel-id';
-          break;
-        default:
-          channelId = 'default-channel-id';
-      }
-    }
+    const channelId = getChannelIdForNotificationType(data?.type);
+    const actions = getNotificationActions(data?.type);
 
     PushNotification.localNotification({
       channelId,
       title: notification.title || 'GATE Guide',
       message: notification.body || '',
-      playSound: true,
+      bigText: notification.body, // For Android expanded view
+      subText: getSubTextForType(data?.type),
+      playSound: shouldPlaySound(data?.type),
       soundName: 'default',
       userInfo: data || {},
       largeIcon: 'ic_launcher',
       smallIcon: 'ic_notification',
+      color: getColorForType(data?.type),
+      actions: actions,
+      invokeApp: false, // Don't automatically open app
+      autoCancel: true,
+      ongoing: false,
+      priority: getPriorityForType(data?.type),
+      visibility: 'public',
     });
   };
 
-  // Handle notification open/tap
-  const handleNotificationOpen = notification => {
-    console.log('Handling notification open:', notification);
-
-    // Mark notification as read if ID is available
-    if (notification.data && notification.data.notificationId) {
-      markNotificationsRead([notification.data.notificationId]);
+  // Get appropriate notification channel based on type
+  const getChannelIdForNotificationType = (type) => {
+    switch (type) {
+      case 'quote':
+      case 'daily_quote':
+        return 'quotes';
+      case 'reminder':
+      case 'task_reminder':
+      case 'study_reminder':
+      case 'streak_reminder':
+        return 'reminders';
+      case 'progress':
+      case 'achievement':
+      case 'weekly_report':
+        return 'progress';
+      case 'quiz_result':
+      case 'test_complete':
+        return 'high-priority';
+      default:
+        return 'high-priority';
     }
-
-    // Handle navigation based on notification type
-    // This will be implemented based on your navigation structure
   };
 
-  // Fetch notifications from API
-  const fetchNotifications = async (page = 1, limit = 20) => {
+  // Get notification actions based on type
+  const getNotificationActions = (type) => {
+    switch (type) {
+      case 'study_reminder':
+        return ['start_study', 'snooze'];
+      case 'quiz_reminder':
+        return ['take_quiz', 'later'];
+      case 'streak_reminder':
+        return ['continue_streak', 'dismiss'];
+      default:
+        return ['view', 'dismiss'];
+    }
+  };
+
+  // Get subtitle text for notification type
+  const getSubTextForType = (type) => {
+    switch (type) {
+      case 'quote':
+        return 'Daily Inspiration';
+      case 'reminder':
+      case 'study_reminder':
+        return 'Study Time';
+      case 'progress':
+        return 'Progress Update';
+      case 'achievement':
+        return 'New Achievement';
+      case 'quiz_result':
+        return 'Quiz Complete';
+      default:
+        return 'GATE Guide';
+    }
+  };
+
+  // Determine if notification should play sound
+  const shouldPlaySound = (type) => {
+    const quietTypes = ['quote', 'daily_quote', 'progress'];
+    return !quietTypes.includes(type);
+  };
+
+  // Get notification color based on type
+  const getColorForType = (type) => {
+    switch (type) {
+      case 'quote':
+        return '#2196F3';
+      case 'reminder':
+        return '#FF9800';
+      case 'progress':
+        return '#4CAF50';
+      case 'achievement':
+        return '#9C27B0';
+      case 'quiz_result':
+        return '#00BCD4';
+      default:
+        return '#007AFF';
+    }
+  };
+
+  // Get notification priority
+  const getPriorityForType = (type) => {
+    const highPriorityTypes = ['quiz_result', 'achievement', 'streak_reminder'];
+    const lowPriorityTypes = ['quote', 'daily_quote'];
+    
+    if (highPriorityTypes.includes(type)) return 'high';
+    if (lowPriorityTypes.includes(type)) return 'low';
+    return 'default';
+  };
+
+  // Handle notification actions
+  const handleNotificationAction = (notification) => {
+    const { action, userInfo } = notification;
+    console.log('Handling notification action:', action, userInfo);
+
+    switch (action) {
+      case 'start_study':
+        navigateToScreen('Timer');
+        break;
+      case 'take_quiz':
+        navigateToScreen('Quiz');
+        break;
+      case 'continue_streak':
+        navigateToScreen('Home');
+        break;
+      case 'view':
+        handleNotificationOpen(notification);
+        break;
+      case 'snooze':
+      case 'later':
+      case 'dismiss':
+        // Handle snooze logic if needed
+        break;
+    }
+  };
+
+  // Show in-app notification (banner style)
+  const showInAppNotification = (remoteMessage) => {
+    // This can be implemented with a custom in-app notification component
+    // For now, we'll just log it
+    console.log('Would show in-app notification:', remoteMessage);
+  };
+
+  // Enhanced notification open handler with deep linking
+  const handleNotificationOpen = (notification) => {
+    console.log('Handling notification open:', notification);
+
+    const data = notification.data || notification.userInfo || {};
+    
+    // Mark notification as read if ID is available
+    if (data.notificationId) {
+      markNotificationsRead([data.notificationId]);
+    }
+
+    // Handle navigation based on notification type and data
+    handleNotificationNavigation(data);
+  };
+
+  // Smart navigation handler
+  const handleNotificationNavigation = (data) => {
+    const { type, navigationTarget, navigationParams, subjectId, topicId, quizId, resourceId } = data;
+
+    // Use explicit navigation target if provided
+    if (navigationTarget) {
+      navigateToScreen(navigationTarget, navigationParams);
+      return;
+    }
+
+    // Smart navigation based on notification type
+    switch (type) {
+      case 'quote':
+      case 'daily_quote':
+        navigateToScreen('Quotes');
+        break;
+        
+      case 'study_reminder':
+      case 'task_reminder':
+        navigateToScreen('Planner');
+        break;
+        
+      case 'streak_reminder':
+        navigateToScreen('TrackerTab', { screen: 'Tracker' });
+        break;
+        
+      case 'progress':
+      case 'weekly_report':
+        navigateToScreen('AnalyticsTab', { screen: 'Analytics' });
+        break;
+        
+      case 'quiz_result':
+        if (quizId) {
+          navigateToScreen('QuizResult', { quizId });
+        } else {
+          navigateToScreen('QuizHistory');
+        }
+        break;
+        
+      case 'quiz_reminder':
+        navigateToScreen('Quiz', { subjectId, topicId });
+        break;
+        
+      case 'achievement':
+        navigateToScreen('TrackerTab', { screen: 'Tracker' });
+        break;
+        
+      case 'resource_added':
+        if (resourceId) {
+          navigateToScreen('ResourceDetail', { resourceId });
+        } else {
+          navigateToScreen('ResourcesTab', { screen: 'Resources' });
+        }
+        break;
+        
+      case 'subject_progress':
+        if (subjectId) {
+          navigateToScreen('SubjectDetail', { subjectId });
+        } else {
+          navigateToScreen('SyllabusTab', { screen: 'Syllabus' });
+        }
+        break;
+        
+      default:
+        // Default to notifications screen
+        navigateToScreen('Notifications');
+    }
+  };
+
+  // Navigation helper
+  const navigateToScreen = (screenName, params = {}) => {
+    if (navigationRef.current) {
+      try {
+        navigationRef.current.navigate(screenName, params);
+      } catch (error) {
+        console.error('Navigation error:', error);
+        // Fallback to home screen
+        navigationRef.current.navigate('Home');
+      }
+    } else {
+      console.warn('Navigation ref not available');
+    }
+  };
+
+  // Register FCM token with backend
+  const registerTokenWithBackend = async (token) => {
+    if (!token || !isAuthenticated) return;
+
+    try {
+      console.log('Registering FCM token with backend:', token.substring(0, 20) + '...');
+      const response = await api.notifications.updateFcmToken(token);
+      console.log('FCM token registration response:', response.data);
+      setTokenRegistered(true);
+      console.log('FCM token registered with backend successfully');
+    } catch (error) {
+      console.error('Error registering FCM token with backend:', error);
+      if (error.response) {
+        console.error('Response status:', error.response.status);
+        console.error('Response data:', error.response.data);
+      }
+      setTokenRegistered(false);
+    }
+  };
+
+  // Fetch notifications from API with enhanced filtering
+  const fetchNotifications = async (page = 1, limit = 20, filters = {}) => {
     if (!isAuthenticated) return;
 
     setLoading(true);
     try {
       console.log('Fetching notifications from API...');
-      const response = await api.notifications.getNotifications(page, limit);
+      const params = { page, limit, ...filters };
+      const response = await api.notifications.getNotifications(params.page, params.limit);
       console.log('Notifications response:', response.data);
 
       if (response.data && response.data.notifications) {
-        setNotifications(response.data.notifications);
+        if (page === 1) {
+          setNotifications(response.data.notifications);
+        } else {
+          // Append for pagination
+          setNotifications(prev => [...prev, ...response.data.notifications]);
+        }
+        
         const unread = response.data.notifications.filter(n => !n.read).length;
         setUnreadCount(unread);
-        console.log(
-          `Loaded ${response.data.notifications.length} notifications, ${unread} unread`,
-        );
+        console.log(`Loaded ${response.data.notifications.length} notifications, ${unread} unread`);
       }
     } catch (error) {
       console.error('Error fetching notifications:', error);
-      if (error.response) {
-        console.error('Response status:', error.response.status);
-        console.error('Response data:', error.response.data);
-      }
     } finally {
       setLoading(false);
     }
   };
 
+  // Bulk mark notifications as read
+  const markAllNotificationsRead = async () => {
+    const unreadIds = notifications.filter(n => !n.read).map(n => n.id);
+    if (unreadIds.length > 0) {
+      await markNotificationsRead(unreadIds);
+    }
+  };
+
   // Mark notifications as read
-  const markNotificationsRead = async notificationIds => {
+  const markNotificationsRead = async (notificationIds) => {
     if (!isAuthenticated || !notificationIds.length) return;
 
     try {
       console.log('Marking notifications as read:', notificationIds);
       await api.notifications.markRead(notificationIds);
 
-      // Update local state
       setNotifications(prev =>
         prev.map(notification =>
           notificationIds.includes(notification.id)
@@ -352,7 +598,6 @@ export const NotificationProvider = ({ children }) => {
         ),
       );
 
-      // Update unread count
       setUnreadCount(prev => Math.max(0, prev - notificationIds.length));
       console.log('Notifications marked as read successfully');
     } catch (error) {
@@ -360,20 +605,18 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Delete notifications
-  const deleteNotifications = async notificationIds => {
+  // Delete notifications with confirmation
+  const deleteNotifications = async (notificationIds) => {
     if (!isAuthenticated || !notificationIds.length) return;
 
     try {
       console.log('Deleting notifications:', notificationIds);
       await api.notifications.deleteNotifications(notificationIds);
 
-      // Update local state
       setNotifications(prev =>
         prev.filter(notification => !notificationIds.includes(notification.id)),
       );
 
-      // Update unread count
       const unreadDeleted = notifications.filter(
         n => notificationIds.includes(n.id) && !n.read,
       ).length;
@@ -385,19 +628,33 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
-  // Clear all notifications
+  // Clear all notifications with confirmation
   const clearAllNotifications = async () => {
     if (!isAuthenticated) return;
 
-    try {
-      console.log('Clearing all notifications...');
-      await api.notifications.clearAllNotifications();
-      setNotifications([]);
-      setUnreadCount(0);
-      console.log('All notifications cleared successfully');
-    } catch (error) {
-      console.error('Error clearing notifications:', error);
-    }
+    Alert.alert(
+      'Clear All Notifications',
+      'Are you sure you want to delete all notifications? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              console.log('Clearing all notifications...');
+              await api.notifications.clearAllNotifications();
+              setNotifications([]);
+              setUnreadCount(0);
+              console.log('All notifications cleared successfully');
+            } catch (error) {
+              console.error('Error clearing notifications:', error);
+              Alert.alert('Error', 'Failed to clear notifications');
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Fetch notification preferences
@@ -417,14 +674,12 @@ export const NotificationProvider = ({ children }) => {
   };
 
   // Update notification preferences
-  const updateNotificationPreferences = async newPreferences => {
+  const updateNotificationPreferences = async (newPreferences) => {
     if (!isAuthenticated) return;
 
     try {
       console.log('Updating notification preferences:', newPreferences);
-      const response = await api.notifications.updatePreferences(
-        newPreferences,
-      );
+      const response = await api.notifications.updatePreferences(newPreferences);
       if (response.data) {
         setPreferences(response.data);
         console.log('Notification preferences updated successfully');
@@ -448,23 +703,16 @@ export const NotificationProvider = ({ children }) => {
 
     if (!fcmToken) {
       console.log('FCM token not available');
-      Alert.alert(
-        'Error',
-        'FCM token not available. Please check your notification permissions.',
-      );
+      Alert.alert('Error', 'FCM token not available. Please check your notification permissions.');
       return false;
     }
 
     if (!tokenRegistered) {
       console.log('FCM token not registered with backend');
-      // Try to register token first
       await registerTokenWithBackend(fcmToken);
 
       if (!tokenRegistered) {
-        Alert.alert(
-          'Error',
-          'FCM token not registered with backend. Please try again.',
-        );
+        Alert.alert('Error', 'FCM token not registered with backend. Please try again.');
         return false;
       }
     }
@@ -474,12 +722,8 @@ export const NotificationProvider = ({ children }) => {
       const response = await api.notifications.sendTestNotification();
       console.log('Test notification API response:', response.data);
 
-      Alert.alert(
-        'Success',
-        'Test notification sent successfully! You should receive it shortly.',
-      );
+      Alert.alert('Success', 'Test notification sent successfully! You should receive it shortly.');
 
-      // Refresh notifications to include the new test notification
       setTimeout(() => {
         fetchNotifications();
       }, 1000);
@@ -487,14 +731,12 @@ export const NotificationProvider = ({ children }) => {
       return true;
     } catch (error) {
       console.error('Error sending test notification:', error);
-
       let errorMessage = 'Failed to send test notification';
       if (error.response) {
         console.error('Response status:', error.response.status);
         console.error('Response data:', error.response.data);
         errorMessage = error.response.data?.message || errorMessage;
       }
-
       Alert.alert('Error', errorMessage);
       return false;
     }
@@ -522,6 +764,24 @@ export const NotificationProvider = ({ children }) => {
     }
   };
 
+  // Schedule local reminder (for offline reminders)
+  const scheduleLocalReminder = (title, body, date, data = {}) => {
+    PushNotification.localNotificationSchedule({
+      title,
+      message: body,
+      date,
+      userInfo: data,
+      playSound: true,
+      soundName: 'default',
+      channelId: 'reminders',
+    });
+  };
+
+  // Cancel scheduled local notification
+  const cancelLocalReminder = (notificationId) => {
+    PushNotification.cancelLocalNotifications({ id: notificationId });
+  };
+
   const value = {
     fcmToken,
     notifications,
@@ -529,14 +789,19 @@ export const NotificationProvider = ({ children }) => {
     loading,
     preferences,
     tokenRegistered,
+    setNavigationRef, // Export for AppNavigator
     fetchNotifications,
     markNotificationsRead,
+    markAllNotificationsRead,
     deleteNotifications,
     clearAllNotifications,
     updateNotificationPreferences,
     sendTestNotification,
     fetchNotificationPreferences,
     refreshFcmToken,
+    scheduleLocalReminder,
+    cancelLocalReminder,
+    navigateToScreen, // For external navigation triggers
   };
 
   return (

@@ -626,6 +626,10 @@ const AiGuideScreen = ({ navigation }) => {
         title={currentConversation?.title || 'AI Guide'}
         navigation={navigation}
         onBack={() => navigation.goBack()}
+        rightIcon={'add-circle-outline'}
+        onRightPress={handleNewChat}
+        rightIcon2={'history'}
+        onRightPress2={() => setShowConversationsList(true)}
       />
       {/* {renderHeaderButtons()} */}
 

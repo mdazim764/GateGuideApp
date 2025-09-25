@@ -95,9 +95,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: theme.background }]}
-    >
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <CustomHeader title="Notification Settings" navigation={navigation} />
 
       <ScrollView style={styles.scrollContainer}>
@@ -341,7 +339,7 @@ const NotificationSettingsScreen = ({ navigation }) => {
           )}
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 };
 
