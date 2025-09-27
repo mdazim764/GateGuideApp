@@ -13,6 +13,7 @@ import {
   Easing,
   Platform,
   StatusBar,
+  Button,
   SafeAreaView as RNSafeAreaView, // Fallback
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,7 +27,7 @@ import { useNotification } from '../context/NotificationContext'; // Add this im
 // Import your components
 import QuoteCard from '../components/quotes/QuoteCard';
 import NotificationBadge from '../components/NotificationBadge'; // Add this import
-
+import crashlytics from '@react-native-firebase/crashlytics';
 const { width } = Dimensions.get('window');
 
 // Default theme fallback to prevent undefined errors
@@ -259,6 +260,36 @@ const HomeScreen = ({ navigation }) => {
     loadDashboardData();
   }, []);
 
+  // Inside your MainScreen component:
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      // Set status bar color properly
+      if (theme.background === '#121212') {
+        StatusBar.setBackgroundColor('#121212');
+        StatusBar.setBarStyle('light-content');
+      } else {
+        StatusBar.setBackgroundColor('#FFFFFF');
+        StatusBar.setBarStyle('dark-content');
+      }
+
+      // Use the recommended approach for navigation bar color
+      const setNavigationBarColor = async () => {
+        try {
+          if (theme.background === '#121212') {
+            await changeNavigationBarColor('#121212', false);
+          } else {
+            await changeNavigationBarColor('#FFFFFF', false);
+          }
+          // await changeNavigationBarColor('#0284c7', false);
+        } catch (e) {
+          console.log(e);
+        }
+      };
+
+      setNavigationBarColor();
+    }
+  }, []);
+
   // Pull-to-refresh handler
   const handleRefresh = () => {
     loadDashboardData(true);
@@ -279,6 +310,13 @@ const HomeScreen = ({ navigation }) => {
     <SafeAreaView
       style={[styles.container, { backgroundColor: theme.background }]}
     >
+      {/* <Button
+        title="Test Crash"
+        onPress={() => {
+          console.log('Forcing a crash!');
+          crashlytics().crash();
+        }}
+      /> */}
       {theme.background === '#121212' && Platform.OS === 'android'
         ? (console.log(
             'Rendering dark mode status bar for Android',

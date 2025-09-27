@@ -22,10 +22,7 @@ const QuizResultScreen = ({ navigation, route }) => {
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
   const [subjects, setSubjects] = useState([]); // Add subjects state
-  const correctCount =
-    Math.floor((result.score / 100) * result.totalQuestions) || 0;
-  const incorrectCount =
-    result.feedback?.incorrectCount || result.totalQuestions - correctCount;
+
   // Add function to fetch subjects
   const fetchSubjects = async () => {
     try {
@@ -119,7 +116,10 @@ const QuizResultScreen = ({ navigation, route }) => {
       </View>
     );
   }
-
+  const correctCount =
+    Math.floor((result.score / 100) * result.totalQuestions) || 0;
+  const incorrectCount =
+    result.feedback?.incorrectCount || result.totalQuestions - correctCount;
   // Format time (e.g., 125 seconds -> "2:05")
   const formatTime = seconds => {
     const mins = Math.floor(seconds / 60);

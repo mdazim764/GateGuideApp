@@ -1,4 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#000000</color>  <!-- You can change this hex code to your app's primary color -->
+    <color name="primary">#4285F4</color>
     <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    <color name="notification_icon_color">#FFFFFF</color>
+    <color name="app_bg">#FFFFFF</color>
+    <color name="transparent">#00000000</color>
 </resources>

@@ -4,9 +4,11 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Choose the appropriate base URL depending on environment
-const BASE_URL = __DEV__
-  ? 'http://192.168.142.245:3000/api'
-  : 'https://gate-guide-backend.onrender.com/api';
+// const BASE_URL = __DEV__
+//   ? 'http://192.168.142.245:3000/api'
+//   : 'https://gate-guide-backend.onrender.com/api';
+
+const BASE_URL = 'https://gate-guide-api.onrender.com/api';
 
 console.log('Connecting to API at:', BASE_URL);
 

@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -13,10 +13,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ThemeContext } from '../theme/ThemeContext';
-import subjects from '../data/subjects';
+// import subjects from '../data/subjects';
 import { useApp } from '../context/AppContext';
 import CustomHeader from '../components/CustomHeader';
 import api from '../services/api';
+import { useData } from '../context/DataContext';
 
 const TABS = [
   { key: 'syllabus', label: 'Syllabus' },
@@ -28,6 +29,14 @@ const TABS = [
 const TrackerScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
   const { progress, updateProgress } = useApp();
+  const {
+    syllabusWithProgress,
+    subjects,
+    loading: dataLoading,
+    errors: dataErrors,
+    fetchSyllabusWithProgress,
+    fetchSubjects,
+  } = useData();
 
   // Add safe destructuring with defaults
   const {
@@ -61,21 +70,12 @@ const TrackerScreen = ({ navigation, route }) => {
   const [pyqQuestions, setPyqQuestions] = useState([]);
   const [subjectsData, setSubjectsData] = useState([]);
   const [dashboardData, setDashboardData] = useState(null);
+
   // --- Progress Calculations ---
   const calculateProgress = () => {
-    let totalTopics = 0;
-    let completedTopics = 0;
-    subjects.forEach(subject => {
-      subject.topics.forEach(topic => {
-        totalTopics++;
-        if (
-          progress[subject.id] &&
-          progress[subject.id][topic.id] === 'completed'
-        ) {
-          completedTopics++;
-        }
-      });
-    });
+    let totalTopics = dashboardData?.totalSubtopics || 0;
+    let completedTopics = dashboardData?.completedSubtopics || 0;
+
     return {
       percentage:
         totalTopics > 0 ? Math.round((completedTopics / totalTopics) * 100) : 0,
@@ -107,6 +107,8 @@ const TrackerScreen = ({ navigation, route }) => {
     if (!subject || !subject.units) {
       return { percentage: 0, completed: 0, total: 0 };
     }
+
+    console.log('Calculating progress for subject:', subject.name);
 
     // Calculate totals from topics that have API-provided progress values
     let totalTopics = 0;
@@ -143,6 +145,9 @@ const TrackerScreen = ({ navigation, route }) => {
         ? Math.round((completedSubtopics / totalSubtopics) * 100)
         : 0;
 
+    console.log(
+      `Subject: ${subject.name}, Completed Subtopics: ${completedSubtopics}, Total Subtopics: ${totalSubtopics}, Percentage: ${percentage}%`,
+    );
     return {
       percentage,
       completed: completedSubtopics,
@@ -156,7 +161,8 @@ const TrackerScreen = ({ navigation, route }) => {
   const calculateTopicProgress = topic => {
     // Use the progress value directly provided by the API
     if (topic && topic.progress !== undefined) {
-      return topic.progress;
+      console.log('Topic progress from API:', topic.progress);
+      return typeof topic.progress === 'number' ? topic.progress : 0;
     }
 
     // Fallback calculation only if API doesn't provide progress
@@ -241,6 +247,10 @@ const TrackerScreen = ({ navigation, route }) => {
   React.useEffect(() => {
     console.log('Available API modules:', Object.keys(api));
     console.log('API PYQ module:', api.pyq);
+  }, []);
+
+  useEffect(() => {
+    loadData();
   }, []);
 
   // Find the subject if an ID was provided
@@ -338,54 +348,30 @@ const TrackerScreen = ({ navigation, route }) => {
     if (selectedTab === 'syllabus') {
       setIsLoading(prev => ({ ...prev, subjects: true }));
       try {
-        // Fetch dashboard summary data
+        // First get dashboard summary
         const summaryResponse = await api.dashboard.getSummary();
         setDashboardData(summaryResponse.data);
-        // Get syllabus with progress data from API
-        const response = await api.academic.getSyllabusWithProgress();
-        console.log('Syllabus data fetched:', response.data);
 
-        if (response.data) {
-          // Update the main syllabus data
-          setSubjectsData(response.data);
+        // Use cached syllabus data or fetch if not available
+        if (!syllabusWithProgress) {
+          await fetchSyllabusWithProgress();
+        } else {
+          // Update completed subtopics from cached data
+          updateCompletedSubtopicsFromData(syllabusWithProgress);
+          setSubjectsData(syllabusWithProgress);
+        }
 
-          // Also update the completedSubtopics Set
-          updateCompletedSubtopicsFromData(response.data);
-
-          // If we have a selected subject, get fresh details for it
-          if (selectedSubject) {
-            const freshSubject = response.data.find(
-              s => s.id === selectedSubject.id,
-            );
-            if (freshSubject) {
-              setSelectedSubject(freshSubject);
-
-              // If we have a selected topic, find it in the fresh data
-              if (selectedTopic) {
-                let foundTopic = null;
-
-                // Look for the topic in the fresh subject data
-                freshSubject.units.forEach(unit => {
-                  const topic = unit.topics.find(
-                    t => t.id === selectedTopic.id,
-                  );
-                  if (topic) foundTopic = topic;
-                });
-
-                // Update the selected topic with fresh data if found
-                if (foundTopic) {
-                  setSelectedTopic(foundTopic);
-                }
-              }
-            }
+        // Refresh specific subject data if selected
+        if (selectedSubject) {
+          const freshSubject = syllabusWithProgress?.find(
+            s => s.id === selectedSubject.id,
+          );
+          if (freshSubject) {
+            setSelectedSubject(freshSubject);
           }
         }
       } catch (err) {
         console.error('Error loading syllabus data:', err);
-        Alert.alert(
-          'Failed to Load',
-          'Could not load syllabus data. Please check your connection and try again.',
-        );
       } finally {
         setIsLoading(prev => ({ ...prev, subjects: false }));
       }
@@ -573,7 +559,7 @@ const TrackerScreen = ({ navigation, route }) => {
               style={[
                 styles.progressBar,
                 {
-                  width: `${calculateTopicProgress(selectedTopic)}%`,
+                  width: `${calculateTopicProgress(selectedTopic) || 0}%`,
                   backgroundColor: theme.primary,
                 },
               ]}
@@ -712,14 +698,14 @@ const TrackerScreen = ({ navigation, route }) => {
                 style={[
                   styles.progressBar,
                   {
-                    width: `${selectedSubject?.progress}%`,
+                    width: `${selectedSubject?.progress || 0}%`,
                     backgroundColor: theme.primary,
                   },
                 ]}
               />
             </View>
             <Text style={[styles.overallText, { color: theme.text }]}>
-              {selectedSubject?.progress}% Complete
+              {selectedSubject?.progress || 0}% Complete
             </Text>
           </View>
 
@@ -788,7 +774,7 @@ const TrackerScreen = ({ navigation, route }) => {
                             style={[
                               styles.progressBar,
                               {
-                                width: `${calculateTopicProgress(topic)}%`,
+                                width: `${calculateTopicProgress(topic) || 0}%`,
                                 backgroundColor: theme.primary,
                               },
                             ]}
@@ -805,13 +791,10 @@ const TrackerScreen = ({ navigation, route }) => {
                           ]}
                         >
                           {topic.subtopics
-                            ? `${
-                                // topic.subtopics.filter(
-                                //   st => st.status === 'completed',
-                                // ).length
-                                (topic?.progress / 100) *
-                                topic?.subtopics.length
-                              }/${topic.subtopics.length} subtopics`
+                            ? `${Math.round(
+                                ((topic?.progress || 0) / 100) *
+                                  (topic?.subtopics?.length || 0),
+                              )}/${topic.subtopics.length} subtopics`
                             : 'No subtopics'}
                         </Text>
                       </View>
@@ -1255,7 +1238,7 @@ const TrackerScreen = ({ navigation, route }) => {
                   style={[
                     styles.progressBar,
                     {
-                      width: `${dashboardData?.overallProgress}%`,
+                      width: `${dashboardData?.overallProgress || 0}%`,
                       backgroundColor: theme.primary,
                     },
                   ]}

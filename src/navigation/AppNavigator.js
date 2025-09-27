@@ -34,6 +34,7 @@ import QuizHistoryScreen from '../screens/QuizHistoryScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import NotificationSettingsScreen from '../screens/NotificationSettingsScreen';
 import NotificationBadge from '../components/NotificationBadge';
+import CacheManagementScreen from '../screens/CacheManagementScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createStackNavigator();
@@ -217,6 +218,10 @@ const MoreStackScreen = () => (
       component={YouTubeVideoListScreen}
     />
     <MoreStack.Screen name="YouTubePlayer" component={YouTubePlayerScreen} />
+    <MoreStack.Screen
+      name="CacheManagement"
+      component={CacheManagementScreen}
+    />
   </MoreStack.Navigator>
 );
 

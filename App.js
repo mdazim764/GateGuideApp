@@ -1,5 +1,12 @@
 import React, { useEffect, useContext } from 'react';
-import { StatusBar, Platform, LogBox } from 'react-native';
+import {
+  StatusBar,
+  Platform,
+  LogBox,
+  PermissionsAndroid,
+  Alert,
+  Linking,
+} from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { AppProvider } from './src/context/AppContext';
 import { AuthProvider } from './src/context/AuthContext';
@@ -7,7 +14,10 @@ import { ThemeProvider, ThemeContext } from './src/theme/ThemeContext';
 import AppNavigator from './src/navigation/AppNavigator';
 import { testKeychain } from './src/utils/KeychainTest';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NotificationProvider } from './src/context/NotificationContext'; // Add this import
+import { NotificationProvider } from './src/context/NotificationContext';
+import { DataProvider } from './src/context/DataContext';
+import messaging from '@react-native-firebase/messaging';
+import crashlytics from '@react-native-firebase/crashlytics';
 
 LogBox.ignoreLogs([
   'VirtualizedLists should never be nested',
@@ -15,8 +25,129 @@ LogBox.ignoreLogs([
   'ColorPropType will be removed',
 ]);
 
+// Add this function to handle Android permissions
+const requestAndroidNotificationPermissions = async () => {
+  try {
+    const granted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+      {
+        title: 'Notification Permission',
+        message:
+          'GateGuide needs notification permission to send you study reminders and updates.',
+        buttonNeutral: 'Ask Me Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      },
+    );
+    return granted === PermissionsAndroid.RESULTS.GRANTED;
+  } catch (err) {
+    console.warn('Permission request error:', err);
+    return false;
+  }
+};
+
+// Add this function to your App.js
+const requestNotificationPermissions = async () => {
+  try {
+    // For iOS
+    if (Platform.OS === 'ios') {
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+      if (!enabled) {
+        setTimeout(() => {
+          Alert.alert(
+            'Notifications Disabled',
+            'To receive study reminders and updates, please enable notifications in your device settings.',
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Settings', onPress: () => Linking.openSettings() },
+            ],
+          );
+        }, 1000);
+      }
+    }
+    // For Android
+    else if (Platform.OS === 'android') {
+      try {
+        await messaging().requestPermission();
+      } catch (error) {
+        console.log('Notification permission rejected:', error);
+        setTimeout(() => {
+          Alert.alert(
+            'Notifications Disabled',
+            'To receive study reminders and updates, please enable notifications in your device settings.',
+            [
+              { text: 'Later', style: 'cancel' },
+              { text: 'Settings', onPress: () => Linking.openSettings() },
+            ],
+          );
+        }, 1000);
+      }
+    }
+  } catch (error) {
+    console.error('Error requesting notification permissions:', error);
+  }
+};
+
 const App = () => {
-  // const { theme } = useContext(ThemeContext);
+  // Request permissions when the app starts
+  useEffect(() => {
+    const requestNotificationPermissions = async () => {
+      try {
+        // For iOS
+        if (Platform.OS === 'ios') {
+          const authStatus = await messaging().requestPermission();
+          const enabled =
+            authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+            authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+          if (!enabled) {
+            setTimeout(() => {
+              Alert.alert(
+                'Notifications Disabled',
+                'To receive study reminders and updates, please enable notifications in your device settings.',
+                [
+                  { text: 'Later', style: 'cancel' },
+                  {
+                    text: 'Settings',
+                    onPress: () => Linking.openSettings(),
+                  },
+                ],
+              );
+            }, 1000);
+          }
+        }
+        // For Android 13+ (API 33+)
+        else if (Platform.OS === 'android' && Platform.Version >= 33) {
+          const granted = await requestAndroidNotificationPermissions();
+          if (!granted) {
+            setTimeout(() => {
+              Alert.alert(
+                'Notifications Disabled',
+                'To receive study reminders and updates, please enable notifications in your device settings.',
+                [
+                  { text: 'Later', style: 'cancel' },
+                  {
+                    text: 'Settings',
+                    onPress: () => Linking.openSettings(),
+                  },
+                ],
+              );
+            }, 1000);
+          }
+        }
+      } catch (error) {
+        console.error('Error requesting notification permissions:', error);
+      }
+    };
+
+    requestNotificationPermissions();
+  }, []);
+
+  // Rest of your App component remains unchanged
   useEffect(() => {
     if (__DEV__) {
       // Only run in development
@@ -47,20 +178,19 @@ const App = () => {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
-        <ThemeProvider>
-          <AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <DataProvider>
             <AppProvider>
               <NotificationProvider>
-                {/* Add this wrapper */}
-                <StatusBar barStyle="dark-content" />
-                <AppNavigator />
+                <NavigationContainer>
+                  <AppNavigator />
+                </NavigationContainer>
               </NotificationProvider>
-              {/* End wrapper */}
             </AppProvider>
-          </AuthProvider>
-        </ThemeProvider>
-      </NavigationContainer>
+          </DataProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 };

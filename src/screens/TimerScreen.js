@@ -26,12 +26,14 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import api from '../services/api';
 import { useIsFocused } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
+import { useData } from '../context/DataContext';
 
 const { width } = Dimensions.get('window');
 
 const TimerScreen = ({ navigation }) => {
   const { theme } = useContext(ThemeContext);
   const isFocused = useIsFocused();
+  const { subjects, loading: dataLoading, fetchSubjects } = useData();
 
   // Timer state
   const [timerMode, setTimerMode] = useState('focus'); // focus, shortBreak, longBreak
@@ -62,7 +64,6 @@ const TimerScreen = ({ navigation }) => {
     recommendations: true,
     weeklyStats: true,
   });
-  const [subjects, setSubjects] = useState([]);
   const [recommendations, setRecommendations] = useState([]);
 
   // Weekly stats for chart
@@ -86,29 +87,13 @@ const TimerScreen = ({ navigation }) => {
     longBreak: 15 * 60,
   };
 
-  // Fetch subjects on component mount
+  // Set default subject when subjects are available
   useEffect(() => {
-    const fetchSubjects = async () => {
-      try {
-        setLoading(prev => ({ ...prev, subjects: true }));
-        const response = await api.academic.getSubjects();
-        if (response.data && response.data.length > 0) {
-          setSubjects(response.data);
-          // Set first subject as default if none selected
-          if (!selectedSubject && response.data.length > 0) {
-            setSelectedSubject(response.data[0].name);
-            setSelectedSubjectId(response.data[0].id);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching subjects:', error);
-      } finally {
-        setLoading(prev => ({ ...prev, subjects: false }));
-      }
-    };
-
-    fetchSubjects();
-  }, []);
+    if (subjects && subjects.length > 0 && !selectedSubject) {
+      setSelectedSubject(subjects[0].name);
+      setSelectedSubjectId(subjects[0].id);
+    }
+  }, [subjects, selectedSubject]);
 
   // Fetch today's stats whenever screen is focused or sessions completed
   useEffect(() => {
@@ -662,7 +647,7 @@ const TimerScreen = ({ navigation }) => {
             What are you studying?
           </Text>
 
-          {loading.subjects ? (
+          {dataLoading.subjects ? (
             <ActivityIndicator size="small" color={theme.primary} />
           ) : (
             <ScrollView

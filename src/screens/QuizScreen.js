@@ -239,7 +239,8 @@ const QuizScreen = ({ navigation, route }) => {
       } else {
         Alert.alert(
           'Quiz Generation Failed',
-          error.response?.data?.message || 'Failed to generate quiz. Please try again.',
+          error.response?.data?.message ||
+            'Failed to generate quiz. Please try again.',
           [{ text: 'OK' }],
         );
       }
@@ -703,16 +704,21 @@ const QuizScreen = ({ navigation, route }) => {
           style={[
             styles.startButton,
             {
-              backgroundColor: canStartQuiz() && !generatingQuiz
-                ? theme.primary
-                : `${theme.primary}50`,
+              backgroundColor:
+                canStartQuiz() && !generatingQuiz
+                  ? theme.primary
+                  : `${theme.primary}50`,
               opacity: canStartQuiz() && !generatingQuiz ? 1 : 0.7,
             },
           ]}
           onPress={handleStartQuiz}
           disabled={!canStartQuiz() || generatingQuiz}
         >
-          <Icon name={generatingQuiz ? "loading" : "play"} size={24} color="#FFFFFF" />
+          <Icon
+            name={generatingQuiz ? 'loading' : 'play'}
+            size={24}
+            color="#FFFFFF"
+          />
           <Text style={styles.startButtonText}>
             {generatingQuiz ? 'Generating Quiz...' : 'Start Quiz'}
           </Text>
@@ -983,7 +989,7 @@ const QuizScreen = ({ navigation, route }) => {
         navigation={navigation}
         onBack={() => {
           if (setupMode) {
-            navigation.goBack();
+            navigation.goBack(navigation);
           } else {
             Alert.alert(
               'Exit Quiz',

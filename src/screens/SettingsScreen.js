@@ -176,11 +176,13 @@ const SettingsScreen = () => {
   };
 
   const contactSupport = () => {
-    Linking.openURL('mailto:support@gateguideapp.com');
+    Linking.openURL(
+      'mailto:support@gateguideapp.com,azimkhairdi2@gmail.com?subject=GateGuide%20App%20Support&body=Describe%20your%20issue%20or%20feedback%20here.',
+    );
   };
 
   const visitWebsite = () => {
-    Linking.openURL('https://gateguideapp.com');
+    Linking.openURL('https://gate-guide-web-frontend.vercel.app');
   };
 
   const handleLogout = () => {

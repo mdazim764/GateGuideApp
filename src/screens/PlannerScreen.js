@@ -17,11 +17,13 @@ import { Calendar } from 'react-native-calendars';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { ThemeContext } from '../theme/ThemeContext';
 import api from '../services/api'; // Import API service
+import { useData } from '../context/DataContext';
 
 const { width } = Dimensions.get('window');
 
 const PlannerScreen = () => {
   const { theme } = useContext(ThemeContext);
+  const { subjects, loading: dataLoading, fetchSubjects } = useData();
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split('T')[0],
   );
@@ -35,7 +37,7 @@ const PlannerScreen = () => {
   const [markedDates, setMarkedDates] = useState({});
 
   // Add state for syllabus integration
-  const [subjects, setSubjects] = useState([]);
+  const [allSubjects, setAllSubjects] = useState([]);
   const [topics, setTopics] = useState([]);
   const [subtopics, setSubtopics] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState(null);
@@ -48,38 +50,14 @@ const PlannerScreen = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch syllabus subjects on component mount
+  // Use the cached subjects data
   useEffect(() => {
-    const fetchSubjects = async () => {
-      try {
-        const response = await api.academic.getSyllabusTree();
-        if (response.data) {
-          // Add a "General" option for tasks not tied to specific subjects
-          const subjectList = [
-            { id: 'general', name: 'General' },
-            ...response.data,
-          ];
-          setSubjects(subjectList);
-        }
-      } catch (error) {
-        console.error('Error fetching subjects:', error);
-        // Fall back to basic subjects if API fails
-        setSubjects([
-          { id: 'general', name: 'General' },
-          { id: 'os', name: 'Operating Systems' },
-          { id: 'ds', name: 'Data Structures' },
-          { id: 'cn', name: 'Computer Networks' },
-          { id: 'algo', name: 'Algorithms' },
-          { id: 'db', name: 'Database Systems' },
-          { id: 'toc', name: 'Theory of Computation' },
-          { id: 'dl', name: 'Digital Logic' },
-          { id: 'math', name: 'Mathematics' },
-        ]);
-      }
-    };
-
-    fetchSubjects();
-  }, []);
+    if (subjects && subjects.length > 0) {
+      // Add a "General" option for tasks not tied to specific subjects
+      const subjectList = [{ id: 'general', name: 'General' }, ...subjects];
+      setAllSubjects(subjectList);
+    }
+  }, [subjects]);
 
   // Fetch tasks for all dates to mark calendar
   useEffect(() => {
@@ -320,7 +298,7 @@ const PlannerScreen = () => {
       setTaskSubject(task.subject);
 
       // Find subject ID from name
-      const subject = subjects.find(s => s.name === task.subject);
+      const subject = allSubjects.find(s => s.name === task.subject);
       if (subject) {
         setSelectedSubjectId(subject.id);
 
@@ -510,7 +488,7 @@ const PlannerScreen = () => {
 
   // Find subject name from ID
   const getSubjectNameFromId = subjectId => {
-    const subject = subjects.find(s => s.id === subjectId);
+    const subject = allSubjects.find(s => s.id === subjectId);
     return subject ? subject.name : 'General';
   };
 
@@ -804,7 +782,7 @@ const PlannerScreen = () => {
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.subjectSelector}
               >
-                {subjects.map(subject => (
+                {allSubjects.map(subject => (
                   <TouchableOpacity
                     key={subject.id}
                     style={[

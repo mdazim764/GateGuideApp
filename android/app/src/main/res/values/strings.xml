@@ -1,3 +1,4 @@
 <resources>
-    <string name="app_name">GateGuideApp</string>
+    <string name="app_name">Gate2026</string>
+    <!-- <color name="primary">#000000</color> ADD THIS LINE -->
 </resources>

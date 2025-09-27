@@ -1,4 +1,4 @@
-import React, { useContext, useState, useEffect } from 'react';
+import React, { useContext, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,34 +10,27 @@ import {
 import { ThemeContext } from '../theme/ThemeContext';
 import Icon from 'react-native-vector-icons/Ionicons';
 import CustomHeader from '../components/CustomHeader';
-import api from '../services/api';
+import { useData } from '../context/DataContext';
 
 const SyllabusScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [subjects, setSubjects] = useState([]);
+  const { syllabusWithProgress, loading, errors, fetchSyllabusWithProgress } =
+    useData();
 
   useEffect(() => {
-    loadSyllabus();
-  }, []);
-
-  const loadSyllabus = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Use the getSyllabusWithProgress endpoint to get progress data
-      const response = await api.academic.getSyllabusWithProgress();
-      setSubjects(response.data);
-    } catch (err) {
-      console.error('Error loading syllabus:', err);
-      setError('Failed to load syllabus. Please try again.');
-      // Fallback to local data if API fails
-      // setSubjects(SYLLABUS_DATA);
-    } finally {
-      setLoading(false);
+    // Data is automatically loaded by DataProvider
+    // Only refetch if we don't have data and not currently loading
+    if (!syllabusWithProgress && !loading.syllabusWithProgress) {
+      fetchSyllabusWithProgress();
     }
+  }, [
+    syllabusWithProgress,
+    loading.syllabusWithProgress,
+    fetchSyllabusWithProgress,
+  ]);
+
+  const handleRefresh = () => {
+    fetchSyllabusWithProgress(true); // Force refresh
   };
 
   const renderItem = ({ item }) => (
@@ -46,7 +39,7 @@ const SyllabusScreen = ({ navigation, route }) => {
       activeOpacity={0.8}
       onPress={() =>
         navigation?.navigate('SubjectDetail', {
-          subject: item, // Pass the entire subject object
+          subject: item,
         })
       }
     >
@@ -90,29 +83,34 @@ const SyllabusScreen = ({ navigation, route }) => {
         Subjects
       </Text>
 
-      {loading ? (
+      {loading.syllabusWithProgress ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={theme.primary} />
+          <Text style={[styles.loadingText, { color: theme.text }]}>
+            Loading syllabus...
+          </Text>
         </View>
-      ) : error ? (
+      ) : errors.syllabusWithProgress ? (
         <View style={styles.errorContainer}>
           <Text style={[styles.errorText, { color: theme.error }]}>
-            {error}
+            {errors.syllabusWithProgress}
           </Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: theme.primary }]}
-            onPress={loadSyllabus}
+            onPress={handleRefresh}
           >
             <Text style={styles.retryText}>Retry</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          data={subjects}
+          data={syllabusWithProgress || []}
           renderItem={renderItem}
           keyExtractor={item => item.id}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContent}
+          refreshing={loading.syllabusWithProgress}
+          onRefresh={handleRefresh}
         />
       )}
     </View>
@@ -167,6 +165,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 8,
+    textAlign: 'center',
   },
   errorContainer: {
     flex: 1,

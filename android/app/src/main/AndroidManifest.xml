@@ -1,4 +1,4 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
         <uses-permission android:name="android.permission.VIBRATE" />
@@ -25,6 +25,12 @@
         </intent-filter>
       </activity>
 
+      <meta-data
+          android:name="com.google.firebase.messaging.default_notification_color"
+          android:resource="@color/primary"
+          tools:replace="android:resource" />
+
+
       <meta-data  android:name="com.dieam.reactnativepushnotification.notification_channel_name"
                 android:value="YOUR NOTIFICATION CHANNEL NAME"/>
         <meta-data  android:name="com.dieam.reactnativepushnotification.notification_channel_description"
@@ -37,8 +43,9 @@
         <meta-data  android:name="com.dieam.reactnativepushnotification.channel_create_default"
                     android:value="true"/>
         <!-- Change the resource name to your App's accent color - or any other color you want -->
-        <meta-data  android:name="com.dieam.reactnativepushnotification.notification_color"
-                    android:resource="@color/white"/> <!-- or @android:color/{name} to use a standard color -->
+        <meta-data  
+            android:name="com.dieam.reactnativepushnotification.notification_color"
+            android:resource="@color/primary" /> <!-- Changed from white to primary -->
 
         <receiver android:name="com.dieam.reactnativepushnotification.modules.RNPushNotificationActions" android:exported="true"  />
         <receiver android:name="com.dieam.reactnativepushnotification.modules.RNPushNotificationPublisher" android:exported="true"  />

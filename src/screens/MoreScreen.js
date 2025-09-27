@@ -33,6 +33,11 @@ const MoreScreen = ({ navigation }) => {
     },
     { name: 'Analytics', screen: 'Analytics', icon: 'bar-chart-outline' },
     { name: 'Settings', screen: 'Settings', icon: 'settings-outline' },
+    {
+      name: 'CacheManagement',
+      screen: 'CacheManagement',
+      icon: 'trash-outline',
+    },
   ];
 
   return (
