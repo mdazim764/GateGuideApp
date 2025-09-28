@@ -19,6 +19,8 @@ import {
   FlatList,
   Animated,
   Easing,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeContext } from '../theme/ThemeContext';
@@ -27,6 +29,7 @@ import api from '../services/api';
 import { useIsFocused } from '@react-navigation/native';
 import { LineChart } from 'react-native-chart-kit';
 import { useData } from '../context/DataContext';
+import DropDownPicker from 'react-native-dropdown-picker';
 
 const { width } = Dimensions.get('window');
 
@@ -36,17 +39,21 @@ const TimerScreen = ({ navigation }) => {
   const { subjects, loading: dataLoading, fetchSubjects } = useData();
 
   // Timer state
-  const [timerMode, setTimerMode] = useState('focus'); // focus, shortBreak, longBreak
+  const [timerMode, setTimerMode] = useState('focus');
   const [isRunning, setIsRunning] = useState(false);
-  const [timeRemaining, setTimeRemaining] = useState(25 * 60); // 25 minutes in seconds
+  const [timeRemaining, setTimeRemaining] = useState(25 * 60);
   const [completedSessions, setCompletedSessions] = useState(0);
   const [selectedSubject, setSelectedSubject] = useState(null);
   const [selectedSubjectId, setSelectedSubjectId] = useState(null);
+  const [selectedTopicId, setSelectedTopicId] = useState(null);
+  const [topicItems, setTopicItems] = useState([]);
+  const [topicOpen, setTopicOpen] = useState(false);
 
   // Session tracking state
   const [currentSessionId, setCurrentSessionId] = useState(null);
   const [sessionStartTime, setSessionStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [timerCompleted, setTimerCompleted] = useState(false); // Flag to prevent double submission
 
   // Stats state
   const [todayStats, setTodayStats] = useState({
@@ -63,6 +70,8 @@ const TimerScreen = ({ navigation }) => {
     stats: true,
     recommendations: true,
     weeklyStats: true,
+    history: false,
+    topics: false, // Add this
   });
   const [recommendations, setRecommendations] = useState([]);
 
@@ -76,6 +85,12 @@ const TimerScreen = ({ navigation }) => {
   const [sessionHistory, setSessionHistory] = useState([]);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyHasMore, setHistoryHasMore] = useState(true);
+
+  // Custom session modal
+  const [customSessionVisible, setCustomSessionVisible] = useState(false);
+  const [customDuration, setCustomDuration] = useState('');
+  const [customMinutes, setCustomMinutes] = useState('');
+  const [customNotes, setCustomNotes] = useState('');
 
   // Animations
   const progressAnimation = useRef(new Animated.Value(0)).current;
@@ -92,8 +107,44 @@ const TimerScreen = ({ navigation }) => {
     if (subjects && subjects.length > 0 && !selectedSubject) {
       setSelectedSubject(subjects[0].name);
       setSelectedSubjectId(subjects[0].id);
+
+      // Also fetch topics for the default subject
+      if (subjects[0].id) {
+        fetchTopicsForSubject(subjects[0].id);
+      }
     }
   }, [subjects, selectedSubject]);
+
+  // Fetch topics when subject changes
+  const fetchTopicsForSubject = useCallback(async subjectId => {
+    try {
+      // Use getSubjectDetail instead of getSubject
+      const response = await api.academic.getSubjectDetail(subjectId);
+
+      if (response.data && response.data.units) {
+        // Extract all topics from all units
+        const allTopics = response.data.units.flatMap(unit =>
+          unit.topics.map(topic => ({
+            label: topic.name,
+            value: topic.id,
+          })),
+        );
+
+        setTopicItems([
+          { label: 'General (No specific topic)', value: null },
+          ...allTopics,
+        ]);
+      }
+    } catch (error) {
+      console.error('Error fetching topics:', error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedSubjectId) {
+      fetchTopicsForSubject(selectedSubjectId);
+    }
+  }, [selectedSubjectId, fetchTopicsForSubject]);
 
   // Fetch today's stats whenever screen is focused or sessions completed
   useEffect(() => {
@@ -118,7 +169,7 @@ const TimerScreen = ({ navigation }) => {
           }).start();
         }
       } catch (error) {
-        console.error("Error fetching today's stats:", error);
+        console.error('Error fetching today stats:', error);
       } finally {
         setLoading(prev => ({ ...prev, stats: false }));
       }
@@ -135,8 +186,8 @@ const TimerScreen = ({ navigation }) => {
       try {
         setLoading(prev => ({ ...prev, recommendations: true }));
         const response = await api.session.getRecommendations();
-        if (response.data && response.data.recommendations) {
-          setRecommendations(response.data.recommendations);
+        if (response.data) {
+          setRecommendations(response.data.recommendations || []);
         }
       } catch (error) {
         console.error('Error fetching recommendations:', error);
@@ -179,7 +230,9 @@ const TimerScreen = ({ navigation }) => {
           setTimeRemaining(timeRemaining - 1);
           setElapsedTime(elapsedTime + 1);
         }, 1000);
-      } else {
+      } else if (!timerCompleted && timeRemaining === 0) {
+        // Only handle completion if not already completed
+        setTimerCompleted(true);
         handleTimerComplete();
       }
     }
@@ -187,7 +240,13 @@ const TimerScreen = ({ navigation }) => {
     return () => {
       clearTimeout(timer);
     };
-  }, [isRunning, timeRemaining, elapsedTime]);
+  }, [
+    isRunning,
+    timeRemaining,
+    elapsedTime,
+    timerCompleted,
+    handleTimerComplete,
+  ]);
 
   // Start session with backend
   const startSession = useCallback(async () => {
@@ -200,10 +259,9 @@ const TimerScreen = ({ navigation }) => {
     }
 
     try {
-      // Only start a session on the backend for focus sessions
       if (timerMode === 'focus') {
         setSessionStartTime(new Date());
-        // We don't need to create a session in backend until completion
+        setTimerCompleted(false); // Reset completed flag when starting a new session
       }
       return true;
     } catch (error) {
@@ -221,25 +279,28 @@ const TimerScreen = ({ navigation }) => {
         const sessionData = {
           duration: elapsedTime, // seconds
           subjectId: selectedSubjectId,
+          topicId: selectedTopicId,
           type: 'FOCUS',
-          notes: `Completed a ${formatTime(elapsedTime)} focus session`,
+          notes: `Focus session: ${formatTime(elapsedTime)}`,
         };
 
         const response = await api.session.logSession(sessionData);
+
         if (response.data) {
-          setCurrentSessionId(response.data.session.id);
-          // Update local state with new completion
+          console.log('Session logged successfully:', response.data);
           setCompletedSessions(prev => prev + 1);
         }
       }
     } catch (error) {
       console.error('Error completing session:', error);
-      Alert.alert('Error', 'Failed to save your session. Please try again.');
+      Alert.alert('Error', 'Failed to log study session');
     }
-  }, [timerMode, elapsedTime, selectedSubjectId, formatTime]);
+  }, [timerMode, elapsedTime, selectedSubjectId, selectedTopicId, formatTime]);
 
   // Handle timer completion
   const handleTimerComplete = useCallback(async () => {
+    if (timerCompleted) return; // Already completed, prevent double submission
+
     // Play sound or vibration here
 
     // Complete the session in the backend
@@ -259,7 +320,66 @@ const TimerScreen = ({ navigation }) => {
       // After break, go back to focus mode
       switchMode('focus');
     }
-  }, [timerMode, completedSessions, completeSession, switchMode]);
+  }, [
+    timerMode,
+    timerCompleted,
+    completedSessions,
+    completeSession,
+    switchMode,
+  ]);
+
+  // Submit custom session
+  const handleSubmitCustomSession = useCallback(async () => {
+    // Validate input
+    if (!selectedSubjectId) {
+      Alert.alert('Error', 'Please select a subject');
+      return;
+    }
+
+    const hours = parseInt(customDuration) || 0;
+    const minutes = parseInt(customMinutes) || 0;
+
+    if (hours === 0 && minutes === 0) {
+      Alert.alert('Error', 'Please enter a valid duration');
+      return;
+    }
+
+    const totalSeconds = hours * 60 * 60 + minutes * 60;
+
+    try {
+      const sessionData = {
+        duration: totalSeconds,
+        subjectId: selectedSubjectId,
+        topicId: selectedTopicId,
+        type: 'FOCUS',
+        notes: customNotes || `Manual entry: ${hours}h ${minutes}m`,
+      };
+
+      const response = await api.session.logSession(sessionData);
+
+      if (response.data) {
+        // Reset form
+        setCustomDuration('');
+        setCustomMinutes('');
+        setCustomNotes('');
+        setCustomSessionVisible(false);
+
+        // Refresh stats
+        setCompletedSessions(prev => prev + 1);
+
+        Alert.alert('Success', 'Study session logged successfully');
+      }
+    } catch (error) {
+      console.error('Error submitting custom session:', error);
+      Alert.alert('Error', 'Failed to log custom session');
+    }
+  }, [
+    selectedSubjectId,
+    selectedTopicId,
+    customDuration,
+    customMinutes,
+    customNotes,
+  ]);
 
   // Switch timer mode
   const switchMode = useCallback(
@@ -268,6 +388,8 @@ const TimerScreen = ({ navigation }) => {
       setTimeRemaining(timerModes[mode]);
       setIsRunning(false);
       setElapsedTime(0);
+      setTimerCompleted(false); // Reset completed flag when switching modes
+      setManualTimerMode(false); // Switch back to pomodoro mode if in manual
     },
     [timerModes],
   );
@@ -291,6 +413,7 @@ const TimerScreen = ({ navigation }) => {
     setTimeRemaining(timerModes[timerMode]);
     setIsRunning(false);
     setElapsedTime(0);
+    setTimerCompleted(false); // Reset completed flag when resetting timer
   }, [timerMode, timerModes]);
 
   // Format time as MM:SS
@@ -302,11 +425,32 @@ const TimerScreen = ({ navigation }) => {
       .padStart(2, '0')}`;
   }, []);
 
-  // Handle subject selection
-  const handleSubjectSelect = useCallback(subject => {
-    setSelectedSubject(subject.name);
-    setSelectedSubjectId(subject.id);
+  // Format time in HH:MM:SS format
+  const formatTimeHMS = useCallback(seconds => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${minutes.toString().padStart(2, '0')}:${secs
+        .toString()
+        .padStart(2, '0')}`;
+    }
+    return `${minutes}:${secs.toString().padStart(2, '0')}`;
   }, []);
+
+  // Handle subject selection
+  const handleSubjectSelect = useCallback(
+    subject => {
+      setSelectedSubject(subject.name);
+      setSelectedSubjectId(subject.id);
+      setSelectedTopicId(null); // Reset topic selection when subject changes
+
+      // Fetch topics for the selected subject
+      fetchTopicsForSubject(subject.id);
+    },
+    [fetchTopicsForSubject],
+  );
 
   // Update study goal
   const updateGoal = useCallback(async () => {
@@ -397,7 +541,7 @@ const TimerScreen = ({ navigation }) => {
       return (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="small" color={theme.primary} />
-          <Text style={{ color: theme.text, marginLeft: 8 }}>
+          <Text style={[styles.loadingText, { color: theme.text }]}>
             Loading recommendations...
           </Text>
         </View>
@@ -406,16 +550,11 @@ const TimerScreen = ({ navigation }) => {
 
     if (recommendations.length === 0) {
       return (
-        <Text
-          style={{
-            color: theme.text,
-            textAlign: 'center',
-            fontStyle: 'italic',
-          }}
-        >
-          No recommendations available yet. Start studying to get personalized
-          recommendations.
-        </Text>
+        <View style={styles.emptyRecommendationsContainer}>
+          <Text style={[styles.emptyText, { color: theme.textSecondary }]}>
+            No recommendations available
+          </Text>
+        </View>
       );
     }
 
@@ -464,6 +603,8 @@ const TimerScreen = ({ navigation }) => {
         datasets: [
           {
             data: [0, 0, 0, 0, 0, 0, 0],
+            color: (opacity = 1) => `rgba(66, 133, 244, ${opacity})`,
+            strokeWidth: 2,
           },
         ],
       };
@@ -495,8 +636,74 @@ const TimerScreen = ({ navigation }) => {
   // Get color of progress bar
   const getProgressColor = percentage => {
     if (percentage >= 100) return '#4CAF50'; // Green
-    if (percentage >= 70) return theme.primary;
+    if (percentage >= 70) return '#8BC34A'; // Light Green
     return '#FF9800'; // Orange
+  };
+
+  // Add this state for manual timer
+  const [manualTimerMode, setManualTimerMode] = useState(false);
+  const [manualElapsedTime, setManualElapsedTime] = useState(0);
+  const [manualTimerRunning, setManualTimerRunning] = useState(false);
+
+  // Add this effect for the manual timer
+  useEffect(() => {
+    let timer;
+
+    if (manualTimerRunning) {
+      timer = setInterval(() => {
+        setManualElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+
+    return () => clearInterval(timer);
+  }, [manualTimerRunning]);
+
+  // Add these functions to control the manual timer
+  const startManualTimer = () => {
+    setManualTimerRunning(true);
+  };
+
+  const pauseManualTimer = () => {
+    setManualTimerRunning(false);
+  };
+
+  const resetManualTimer = () => {
+    setManualElapsedTime(0);
+    setManualTimerRunning(false);
+  };
+
+  const submitManualSession = async () => {
+    if (manualElapsedTime === 0 || !selectedSubjectId) {
+      Alert.alert(
+        'Error',
+        'Please select a subject and record some time before submitting',
+      );
+      return;
+    }
+
+    try {
+      const sessionData = {
+        duration: manualElapsedTime,
+        subjectId: selectedSubjectId,
+        topicId: selectedTopicId,
+        type: 'FOCUS',
+        notes: `Manual session: ${formatTime(manualElapsedTime)}`,
+      };
+
+      const response = await api.session.logSession(sessionData);
+
+      if (response.data) {
+        Alert.alert('Success', 'Study session logged successfully');
+        resetManualTimer();
+        setCompletedSessions(prev => prev + 1);
+        // Refresh stats after submission
+        // fetchTodayStats();
+        setIsRunning(false);
+      }
+    } catch (error) {
+      console.error('Error logging manual session:', error);
+      Alert.alert('Error', 'Failed to log study session');
+    }
   };
 
   return (
@@ -527,17 +734,40 @@ const TimerScreen = ({ navigation }) => {
           <TouchableOpacity
             style={[
               styles.modeButton,
-              timerMode === 'focus' && [
-                styles.activeModeButton,
-                { backgroundColor: theme.primary },
-              ],
+              manualTimerMode && { backgroundColor: theme.primary },
+            ]}
+            onPress={() => setManualTimerMode(true)}
+          >
+            <Text
+              style={[
+                styles.modeButtonText,
+                { color: manualTimerMode ? '#FFFFFF' : theme.text },
+              ]}
+            >
+              Manual
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.modeButton,
+              timerMode === 'focus' &&
+                !manualTimerMode && [
+                  styles.activeModeButton,
+                  { backgroundColor: theme.primary },
+                ],
             ]}
             onPress={() => switchMode('focus')}
           >
             <Text
               style={[
                 styles.modeButtonText,
-                { color: timerMode === 'focus' ? '#FFFFFF' : theme.text },
+                {
+                  color:
+                    timerMode === 'focus' && !manualTimerMode
+                      ? '#FFFFFF'
+                      : theme.text,
+                },
               ]}
             >
               Focus
@@ -547,17 +777,23 @@ const TimerScreen = ({ navigation }) => {
           <TouchableOpacity
             style={[
               styles.modeButton,
-              timerMode === 'shortBreak' && [
-                styles.activeModeButton,
-                { backgroundColor: theme.primary },
-              ],
+              timerMode === 'shortBreak' &&
+                !manualTimerMode && [
+                  styles.activeModeButton,
+                  { backgroundColor: theme.primary },
+                ],
             ]}
             onPress={() => switchMode('shortBreak')}
           >
             <Text
               style={[
                 styles.modeButtonText,
-                { color: timerMode === 'shortBreak' ? '#FFFFFF' : theme.text },
+                {
+                  color:
+                    timerMode === 'shortBreak' && !manualTimerMode
+                      ? '#FFFFFF'
+                      : theme.text,
+                },
               ]}
             >
               Short Break
@@ -567,17 +803,23 @@ const TimerScreen = ({ navigation }) => {
           <TouchableOpacity
             style={[
               styles.modeButton,
-              timerMode === 'longBreak' && [
-                styles.activeModeButton,
-                { backgroundColor: theme.primary },
-              ],
+              timerMode === 'longBreak' &&
+                !manualTimerMode && [
+                  styles.activeModeButton,
+                  { backgroundColor: theme.primary },
+                ],
             ]}
             onPress={() => switchMode('longBreak')}
           >
             <Text
               style={[
                 styles.modeButtonText,
-                { color: timerMode === 'longBreak' ? '#FFFFFF' : theme.text },
+                {
+                  color:
+                    timerMode === 'longBreak' && !manualTimerMode
+                      ? '#FFFFFF'
+                      : theme.text,
+                },
               ]}
             >
               Long Break
@@ -586,66 +828,172 @@ const TimerScreen = ({ navigation }) => {
         </View>
 
         {/* Timer Display */}
-        <View style={[styles.timerContainer, { backgroundColor: theme.card }]}>
-          <Text style={[styles.timerText, { color: theme.text }]}>
-            {formatTime(timeRemaining)}
-          </Text>
 
-          {/* Timer actions */}
-          <View style={styles.timerActions}>
-            <TouchableOpacity
-              style={[
-                styles.timerButton,
-                { backgroundColor: `${theme.primary}20` },
-              ]}
-              onPress={resetTimer}
-            >
-              <Icon name="refresh" size={24} color={theme.primary} />
-            </TouchableOpacity>
+        {/* Manual timer UI */}
+        {manualTimerMode && (
+          <View
+            style={[styles.timerContainer, { backgroundColor: theme.card }]}
+          >
+            <Text style={[styles.timerText, { color: theme.text }]}>
+              {formatTimeHMS(manualElapsedTime)}
+            </Text>
 
-            <TouchableOpacity
-              style={[
-                styles.timerMainButton,
-                { backgroundColor: theme.primary },
-              ]}
-              onPress={toggleTimer}
-            >
-              <Icon
-                name={isRunning ? 'pause' : 'play'}
-                size={32}
-                color="#FFFFFF"
-              />
-            </TouchableOpacity>
+            <Text style={[styles.elapsedText, { color: theme.textSecondary }]}>
+              Time elapsed
+            </Text>
 
-            <TouchableOpacity
-              style={[
-                styles.timerButton,
-                { backgroundColor: `${theme.primary}20` },
-              ]}
-              onPress={() => {
-                // Skip to next mode
-                if (timerMode === 'focus') {
-                  if (isRunning) {
-                    // Complete current session if running
-                    completeSession().then(() => switchMode('shortBreak'));
-                  } else {
-                    switchMode('shortBreak');
-                  }
-                } else {
-                  switchMode('focus');
+            <View style={styles.timerActions}>
+              <TouchableOpacity
+                style={[
+                  styles.timerButton,
+                  { backgroundColor: `${theme.primary}20` },
+                ]}
+                onPress={resetManualTimer}
+              >
+                <Icon name="refresh" size={24} color={theme.primary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.timerMainButton,
+                  { backgroundColor: theme.primary },
+                ]}
+                onPress={
+                  manualTimerRunning ? pauseManualTimer : startManualTimer
                 }
-              }}
+              >
+                <Icon
+                  name={manualTimerRunning ? 'pause' : 'play'}
+                  size={32}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.timerButton,
+                  { backgroundColor: `${theme.primary}20` },
+                ]}
+                onPress={submitManualSession}
+              >
+                <Icon name="check" size={24} color={theme.primary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Original pomodoro timer UI - wrap this in conditional rendering */}
+        {!manualTimerMode && (
+          <View
+            style={[styles.timerContainer, { backgroundColor: theme.card }]}
+          >
+            {/* Main timer (countdown) */}
+            <Text style={[styles.timerText, { color: theme.text }]}>
+              {formatTime(timeRemaining)}
+            </Text>
+
+            {/* Elapsed time display */}
+            {elapsedTime > 0 && (
+              <Text
+                style={[styles.elapsedText, { color: theme.textSecondary }]}
+              >
+                Elapsed: {formatTimeHMS(elapsedTime)}
+              </Text>
+            )}
+
+            {/* Timer actions */}
+            <View style={styles.timerActions}>
+              <TouchableOpacity
+                style={[
+                  styles.timerButton,
+                  { backgroundColor: `${theme.primary}20` },
+                ]}
+                onPress={resetTimer}
+              >
+                <Icon name="refresh" size={24} color={theme.primary} />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.timerMainButton,
+                  { backgroundColor: theme.primary },
+                ]}
+                onPress={toggleTimer}
+              >
+                <Icon
+                  name={isRunning ? 'pause' : 'play'}
+                  size={32}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.timerButton,
+                  { backgroundColor: `${theme.primary}20` },
+                ]}
+                onPress={() => {
+                  if (isRunning) {
+                    // First stop the timer
+                    setIsRunning(false);
+                  }
+
+                  // Skip to next mode
+                  if (timerMode === 'focus') {
+                    // Complete the current focus session if elapsed time > 0
+                    if (elapsedTime > 0 && !timerCompleted) {
+                      setTimerCompleted(true); // Set flag to prevent double submission
+                      completeSession().then(() => {
+                        // After 4 focus sessions, take a long break
+                        if ((completedSessions + 1) % 4 === 0) {
+                          switchMode('longBreak');
+                        } else {
+                          switchMode('shortBreak');
+                        }
+                      });
+                    } else {
+                      // No elapsed time or already completed, just switch
+                      if ((completedSessions + 1) % 4 === 0) {
+                        switchMode('longBreak');
+                      } else {
+                        switchMode('shortBreak');
+                      }
+                    }
+                  } else {
+                    // After break, switch to focus
+                    switchMode('focus');
+                  }
+                }}
+              >
+                <Icon name="skip-next" size={24} color={theme.primary} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Subject and Topic Selection - Enhanced version */}
+        <View style={styles.subjectSection}>
+          <View style={styles.sectionHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              What are you studying?
+            </Text>
+
+            {/* Custom time entry button */}
+            <TouchableOpacity
+              style={[
+                styles.customLogButton,
+                { backgroundColor: `${theme.primary}20` },
+              ]}
+              onPress={() => setCustomSessionVisible(true)}
             >
-              <Icon name="skip-next" size={24} color={theme.primary} />
+              <Icon name="pencil-plus" size={16} color={theme.primary} />
+              <Text
+                style={{ color: theme.primary, fontSize: 14, marginLeft: 4 }}
+              >
+                Custom Entry
+              </Text>
             </TouchableOpacity>
           </View>
-        </View>
-
-        {/* Subject Selection */}
-        <View style={styles.subjectSection}>
-          <Text style={[styles.sectionTitle, { color: theme.text }]}>
-            What are you studying?
-          </Text>
 
           {dataLoading.subjects ? (
             <ActivityIndicator size="small" color={theme.primary} />
@@ -683,6 +1031,82 @@ const TimerScreen = ({ navigation }) => {
                 </TouchableOpacity>
               ))}
             </ScrollView>
+          )}
+
+          {/* Enhanced Topic Selection - similar to PlannerScreen */}
+          {selectedSubjectId && (
+            <View style={styles.topicContainer}>
+              <Text style={[styles.topicLabel, { color: theme.text }]}>
+                Topic (optional)
+              </Text>
+
+              {/* Show loading indicator while fetching topics */}
+              {loading.topics ? (
+                <ActivityIndicator
+                  size="small"
+                  color={theme.primary}
+                  style={{ marginVertical: 10 }}
+                />
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.topicSelector}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.topicOption,
+                      { borderColor: `${theme.text}30` },
+                      !selectedTopicId && {
+                        backgroundColor: `${theme.primary}20`,
+                        borderColor: theme.primary,
+                      },
+                    ]}
+                    onPress={() => setSelectedTopicId(null)}
+                  >
+                    <Text
+                      style={[
+                        styles.topicText,
+                        {
+                          color: !selectedTopicId ? theme.primary : theme.text,
+                        },
+                      ]}
+                    >
+                      None
+                    </Text>
+                  </TouchableOpacity>
+
+                  {topicItems.map(topic => (
+                    <TouchableOpacity
+                      key={topic.value}
+                      style={[
+                        styles.topicOption,
+                        { borderColor: `${theme.text}30` },
+                        selectedTopicId === topic.value && {
+                          backgroundColor: `${theme.primary}20`,
+                          borderColor: theme.primary,
+                        },
+                      ]}
+                      onPress={() => setSelectedTopicId(topic.value)}
+                    >
+                      <Text
+                        style={[
+                          styles.topicText,
+                          {
+                            color:
+                              selectedTopicId === topic.value
+                                ? theme.primary
+                                : theme.text,
+                          },
+                        ]}
+                      >
+                        {topic.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
           )}
         </View>
 
@@ -905,6 +1329,161 @@ const TimerScreen = ({ navigation }) => {
         </View>
       </Modal>
 
+      {/* Custom Session Entry Modal */}
+      <Modal
+        visible={customSessionVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCustomSessionVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <View style={styles.modalOverlay}>
+            <View
+              style={[
+                styles.modalContent,
+                { backgroundColor: theme.card, width: '90%', maxWidth: 400 },
+              ]}
+            >
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Add Custom Study Session
+              </Text>
+
+              <Text style={[styles.modalText, { color: theme.textSecondary }]}>
+                How long did you study?
+              </Text>
+
+              <View style={styles.customTimeRow}>
+                <View style={styles.customTimeInputContainer}>
+                  <TextInput
+                    style={[
+                      styles.customTimeInput,
+                      {
+                        color: theme.text,
+                        backgroundColor: theme.background,
+                        borderColor: `${theme.text}20`,
+                      },
+                    ]}
+                    value={customDuration}
+                    onChangeText={setCustomDuration}
+                    placeholder="0"
+                    placeholderTextColor={`${theme.text}50`}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  <Text style={[styles.customTimeLabel, { color: theme.text }]}>
+                    hours
+                  </Text>
+                </View>
+
+                <View style={styles.customTimeInputContainer}>
+                  <TextInput
+                    style={[
+                      styles.customTimeInput,
+                      {
+                        color: theme.text,
+                        backgroundColor: theme.background,
+                        borderColor: `${theme.text}20`,
+                      },
+                    ]}
+                    value={customMinutes}
+                    onChangeText={setCustomMinutes}
+                    placeholder="30"
+                    placeholderTextColor={`${theme.text}50`}
+                    keyboardType="number-pad"
+                    maxLength={2}
+                  />
+                  <Text style={[styles.customTimeLabel, { color: theme.text }]}>
+                    minutes
+                  </Text>
+                </View>
+              </View>
+
+              {selectedSubjectId && (
+                <View style={styles.customSessionTopicContainer}>
+                  <Text
+                    style={[
+                      styles.modalSubtitle,
+                      { color: theme.text, marginBottom: 8 },
+                    ]}
+                  >
+                    Topic (optional)
+                  </Text>
+                  <DropDownPicker
+                    open={topicOpen}
+                    value={selectedTopicId}
+                    items={topicItems}
+                    setOpen={setTopicOpen}
+                    setValue={setSelectedTopicId}
+                    setItems={setTopicItems}
+                    placeholder="Select a topic"
+                    style={[
+                      styles.topicDropdown,
+                      { backgroundColor: theme.background },
+                    ]}
+                    textStyle={{ color: theme.text }}
+                    dropDownContainerStyle={{
+                      backgroundColor: theme.background,
+                      borderColor: `${theme.text}30`,
+                    }}
+                    placeholderStyle={{ color: `${theme.text}70` }}
+                    zIndex={5000}
+                    zIndexInverse={1000}
+                  />
+                </View>
+              )}
+
+              <Text
+                style={[
+                  styles.modalSubtitle,
+                  { color: theme.text, marginTop: 16, marginBottom: 8 },
+                ]}
+              >
+                Notes (optional)
+              </Text>
+              <TextInput
+                style={[
+                  styles.customNotesInput,
+                  {
+                    color: theme.text,
+                    backgroundColor: theme.background,
+                    borderColor: `${theme.text}20`,
+                  },
+                ]}
+                value={customNotes}
+                onChangeText={setCustomNotes}
+                placeholder="What did you study?"
+                placeholderTextColor={`${theme.text}50`}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+              />
+
+              <View style={styles.modalButtons}>
+                <TouchableOpacity
+                  style={[styles.modalButton, { borderColor: theme.primary }]}
+                  onPress={() => setCustomSessionVisible(false)}
+                >
+                  <Text style={{ color: theme.primary }}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.modalButton,
+                    { backgroundColor: theme.primary },
+                  ]}
+                  onPress={handleSubmitCustomSession}
+                >
+                  <Text style={{ color: '#FFFFFF' }}>Save Session</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
       {/* Session History Modal */}
       <Modal
         visible={historyModalVisible}
@@ -1002,7 +1581,7 @@ const TimerScreen = ({ navigation }) => {
                         { color: theme.text },
                       ]}
                     >
-                      {formatTime(item.duration)}
+                      {formatTimeHMS(item.duration)}
                     </Text>
 
                     {item.topic && (
@@ -1102,6 +1681,11 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 2,
   },
+  elapsedText: {
+    fontSize: 18,
+    marginTop: 8,
+    marginBottom: 8,
+  },
   timerActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1146,6 +1730,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 6,
   },
+  customLogButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
   goalButtonText: {
     marginLeft: 4,
     fontSize: 14,
@@ -1167,6 +1758,20 @@ const styles = StyleSheet.create({
   subjectButtonText: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  topicContainer: {
+    marginTop: 8,
+    zIndex: 1000,
+  },
+  topicLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  topicDropdown: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    borderColor: 'rgba(0,0,0,0.1)',
   },
   statsSection: {
     marginTop: 32,
@@ -1248,6 +1853,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 16,
   },
+  emptyRecommendationsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  emptyText: {
+    fontSize: 14,
+    textAlign: 'center',
+  },
   // Chart styles
   chartContainer: {
     marginTop: 16,
@@ -1292,6 +1906,10 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     textAlign: 'center',
   },
+  modalSubtitle: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
   modalText: {
     fontSize: 16,
     marginBottom: 16,
@@ -1309,6 +1927,7 @@ const styles = StyleSheet.create({
   modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 20,
   },
   modalButton: {
     flex: 1,
@@ -1318,6 +1937,43 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     marginHorizontal: 8,
+  },
+  // Custom time entry styles
+  customTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  customTimeInputContainer: {
+    flex: 1,
+    marginHorizontal: 4,
+    alignItems: 'center',
+  },
+  customTimeInput: {
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    fontSize: 18,
+    textAlign: 'center',
+    width: '100%',
+    marginBottom: 4,
+  },
+  customTimeLabel: {
+    fontSize: 14,
+  },
+  customNotesInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    fontSize: 16,
+    minHeight: 80,
+  },
+  customSessionTopicContainer: {
+    zIndex: 3000,
+    marginTop: 12,
   },
   // History modal styles
   historyModalContainer: {
@@ -1403,6 +2059,41 @@ const styles = StyleSheet.create({
   topicChipText: {
     fontSize: 12,
     color: '#4285F4',
+  },
+  timerModeToggle: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 16,
+    // backgroundColor: `${theme.text}10`,
+    borderRadius: 8,
+    padding: 4,
+  },
+  timerModeButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderRadius: 6,
+  },
+  timerModeButtonText: {
+    fontWeight: '500',
+    fontSize: 14,
+  },
+  topicSelector: {
+    flexDirection: 'row',
+    marginTop: 8,
+    paddingBottom: 16,
+  },
+  topicOption: {
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+  topicText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
 });
 

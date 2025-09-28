@@ -14,8 +14,10 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ThemeContext } from '../theme/ThemeContext';
 import { useNotification } from '../context/NotificationContext';
+import { MaterialIcons } from '@react-native-vector-icons/material-icons';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CustomHeader from '../components/CustomHeader';
+import MaterialDesignIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 
 const NotificationsScreen = ({ navigation }) => {
   const { theme } = React.useContext(ThemeContext);
@@ -189,17 +191,17 @@ const NotificationsScreen = ({ navigation }) => {
 
   const getNotificationIcon = (type, read) => {
     const iconMap = {
-      quote: 'format-quote-open',
-      daily_quote: 'format-quote-open',
+      quote: 'format-quote',
+      morning_quote: 'format-quote-open-outline',
       reminder: 'clock-alert-outline',
       study_reminder: 'book-clock-outline',
-      task_reminder: 'clipboard-clock-outline',
-      streak_reminder: 'fire',
+      task_summary: 'clipboard-clock-outline',
+      streak: 'fire',
       progress: 'chart-line',
       achievement: 'trophy-outline',
       quiz_result: 'check-circle-outline',
       quiz_reminder: 'help-circle-outline',
-      weekly_report: 'chart-bar',
+      weekly_summary: 'chart-line',
       resource_added: 'folder-plus-outline',
       subject_progress: 'book-open-page-variant',
       test: 'bell-outline',
@@ -212,16 +214,16 @@ const NotificationsScreen = ({ navigation }) => {
   const getNotificationColor = type => {
     const colorMap = {
       quote: '#2196F3',
-      daily_quote: '#2196F3',
+      morning_quote: '#2196F3',
       reminder: '#FF9800',
       study_reminder: '#FF9800',
-      task_reminder: '#FF5722',
-      streak_reminder: '#E91E63',
+      task_summary: '#FF5722',
+      streak: '#E91E63',
       progress: '#4CAF50',
       achievement: '#9C27B0',
       quiz_result: '#00BCD4',
       quiz_reminder: '#3F51B5',
-      weekly_report: '#795548',
+      weekly_summary: '#795548',
       resource_added: '#607D8B',
       subject_progress: '#009688',
       test: theme.primary,
@@ -283,7 +285,7 @@ const NotificationsScreen = ({ navigation }) => {
               { backgroundColor: `${iconColor}15` },
             ]}
           >
-            <Icon name={iconName} size={20} color={iconColor} />
+            <MaterialDesignIcon name={iconName} size={20} color={iconColor} />
           </View>
 
           <View style={styles.notificationContent}>
@@ -342,7 +344,7 @@ const NotificationsScreen = ({ navigation }) => {
   const renderFilters = () => (
     <View style={styles.filtersContainer}>
       <View style={styles.searchContainer}>
-        <Icon name="magnify" size={20} color={theme.textSecondary} />
+        <MaterialIcons name="search" size={20} color={theme.textSecondary} />
         <TextInput
           style={[styles.searchInput, { color: theme.text }]}
           placeholder="Search notifications..."
@@ -731,9 +733,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderRadius: 12,
     alignItems: 'flex-start',
+    borderLeftWidth: 3,
+    borderColor: 'green',
   },
   unreadNotification: {
     borderLeftWidth: 3,
+    borderLeftColor: '#FF5722',
   },
   selectionIndicator: {
     marginRight: 12,

@@ -195,7 +195,14 @@ const QuizHistoryScreen = ({ navigation }) => {
                   <Text
                     style={[styles.statText, { color: theme.textSecondary }]}
                   >
-                    {item.correctCount}/{item.totalQuestions} correct
+                    {item.feedback && item.feedback.questionByQuestionReview
+                      ? `${Math.round(
+                          (item.score / 100) *
+                            item.feedback.questionByQuestionReview.length,
+                        )}/${
+                          item.feedback.questionByQuestionReview.length
+                        } correct`
+                      : `${item.score}% correct`}
                   </Text>
                 </View>
                 <View style={styles.statItem}>
