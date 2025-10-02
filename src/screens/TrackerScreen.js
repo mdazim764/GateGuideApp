@@ -570,7 +570,6 @@ const TrackerScreen = ({ navigation, route }) => {
             {selectedTopic.subtopics.length} subtopics completed
           </Text>
         </View>
-        // In the FlatList renderItem for subtopics
         <FlatList
           data={selectedTopic.subtopics}
           keyExtractor={item => item.id}

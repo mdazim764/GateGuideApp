@@ -1237,7 +1237,9 @@ const TimerScreen = ({ navigation }) => {
                   color: (opacity = 1) => `rgba(66, 133, 244, ${opacity})`,
                   labelColor: (opacity = 1) =>
                     `rgba(${
-                      theme.isDark ? '255, 255, 255' : '0, 0, 0'
+                      theme.background === '#121212'
+                        ? '255, 255, 255'
+                        : '0, 0, 0'
                     }, ${opacity})`,
                   style: {
                     borderRadius: 16,
