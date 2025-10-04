@@ -36,6 +36,7 @@ const TrackerScreen = ({ navigation, route }) => {
     errors: dataErrors,
     fetchSyllabusWithProgress,
     fetchSubjects,
+    refreshSyllabusProgress, // Add this import
   } = useData();
 
   // Add safe destructuring with defaults
@@ -185,7 +186,7 @@ const TrackerScreen = ({ navigation, route }) => {
       const subtopic = selectedTopic.subtopics.find(s => s.id === subtopicId);
       if (!subtopic) return;
 
-      // Determine current completion status - using API response data
+      // Determine current completion status
       const isCurrentlyCompleted = subtopic.status === 'completed';
       const newStatus = isCurrentlyCompleted ? 'not_started' : 'completed';
 
@@ -198,7 +199,7 @@ const TrackerScreen = ({ navigation, route }) => {
         `Successfully updated subtopic ${subtopicId} to ${newStatus}`,
       );
 
-      // Update local subtopic state immediately for better UX
+      // Update local topic state immediately for better UX
       setSelectedTopic(prevTopic => ({
         ...prevTopic,
         subtopics: prevTopic.subtopics.map(s =>
@@ -228,10 +229,37 @@ const TrackerScreen = ({ navigation, route }) => {
         return newSet;
       });
 
-      // Refresh all data to ensure consistency
-      setTimeout(() => {
-        loadData();
-      }, 500); // Small delay to ensure API has processed the update
+      // Refresh global syllabus data after a short delay
+      setTimeout(async () => {
+        try {
+          // This will update the cached data in DataContext
+          const freshData = await refreshSyllabusProgress();
+
+          // Update local subjectsData with the fresh data
+          if (freshData) {
+            setSubjectsData(freshData);
+
+            // If we have a selected subject, update it with fresh data
+            if (selectedSubject) {
+              const updatedSubject = freshData.find(
+                s => s.id === selectedSubject.id,
+              );
+              if (updatedSubject) {
+                setSelectedSubject(updatedSubject);
+              }
+            }
+
+            // Update dashboard data
+            const summaryResponse = await api.dashboard.getSummary();
+            if (summaryResponse.data) {
+              setDashboardData(summaryResponse.data);
+            }
+            loadData();
+          }
+        } catch (err) {
+          console.error('Error refreshing data after subtopic update:', err);
+        }
+      }, 300);
     } catch (error) {
       console.error('Error updating subtopic progress:', error);
       Alert.alert(
@@ -574,7 +602,7 @@ const TrackerScreen = ({ navigation, route }) => {
           data={selectedTopic.subtopics}
           keyExtractor={item => item.id}
           renderItem={({ item: subtopic }) => {
-            const isCompleted = subtopic?.progress === 'completed';
+            const isCompleted = subtopic?.status === 'completed';
 
             return (
               <TouchableOpacity

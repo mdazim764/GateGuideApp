@@ -204,6 +204,10 @@ const NotificationsScreen = ({ navigation }) => {
       weekly_summary: 'chart-line',
       resource_added: 'folder-plus-outline',
       subject_progress: 'book-open-page-variant',
+      study_recommendation: 'lightbulb-on-outline',
+      daily_summary: 'calendar-today',
+      task_reminder: 'bell-alert-outline',
+      task_rollover: 'calendar-refresh',
       test: 'bell-outline',
       default: 'bell-outline',
     };
@@ -226,6 +230,10 @@ const NotificationsScreen = ({ navigation }) => {
       weekly_summary: '#795548',
       resource_added: '#607D8B',
       subject_progress: '#009688',
+      study_recommendation: '#FFEB3B',
+      daily_summary: '#8BC34A',
+      task_reminder: '#FF9800',
+      task_rollover: '#FF5722',
       test: theme.primary,
       default: theme.primary,
     };

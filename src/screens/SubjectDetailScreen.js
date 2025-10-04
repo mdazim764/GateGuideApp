@@ -13,10 +13,12 @@ import Icon from 'react-native-vector-icons/Ionicons';
 import MaterialIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CustomHeader from '../components/CustomHeader';
 import api from '../services/api';
+import { useData } from '../context/DataContext';
 
 const SubjectDetailScreen = ({ navigation, route }) => {
   const { theme } = useContext(ThemeContext);
   const { subject } = route.params;
+  const { refreshSyllabusProgress } = useData(); // Add this import
 
   // State to track expanded topics
   const [expandedTopics, setExpandedTopics] = useState({});
@@ -86,6 +88,28 @@ const SubjectDetailScreen = ({ navigation, route }) => {
         }
         return newSet;
       });
+
+      // Refresh syllabus data in DataContext after a short delay 
+      // to ensure server has processed the update
+      setTimeout(async () => {
+        try {
+          // Refresh global syllabus data
+          await refreshSyllabusProgress();
+          
+          // Also refresh local subject data
+          refreshSubjectData();
+          
+          // Notify parent screens if callback provided
+          if (route.params && route.params.onSubjectUpdate) {
+            const response = await api.academic.getSubjectDetail(subject.id);
+            if (response.data) {
+              route.params.onSubjectUpdate(response.data);
+            }
+          }
+        } catch (err) {
+          console.error('Error refreshing data after subtopic update:', err);
+        }
+      }, 300);
     } catch (error) {
       console.error('Error updating subtopic progress:', error);
       Alert.alert('Error', 'Failed to update progress. Please try again.');

@@ -271,6 +271,33 @@ export const DataProvider = ({ children }) => {
     ],
   );
 
+  // Function to refresh syllabus progress after an update
+  const refreshSyllabusProgress = useCallback(async () => {
+    console.log('Refreshing syllabus progress data after update...');
+    try {
+      // Set loading state
+      setLoading(prev => ({ ...prev, syllabusWithProgress: true }));
+
+      // Fetch fresh data directly from API
+      const response = await api.academic.getSyllabusWithProgress();
+      const data = response.data;
+
+      // Update state
+      setSyllabusWithProgress(data);
+
+      // Update cache with fresh data
+      await setCachedData(CACHE_KEYS.SYLLABUS_WITH_PROGRESS, data);
+
+      console.log('Syllabus progress refreshed successfully');
+      return data;
+    } catch (error) {
+      console.error('Error refreshing syllabus progress:', error);
+      throw error;
+    } finally {
+      setLoading(prev => ({ ...prev, syllabusWithProgress: false }));
+    }
+  }, []);
+
   // Function to clear cache
   const clearCache = useCallback(async (dataType = null) => {
     try {
@@ -332,6 +359,7 @@ export const DataProvider = ({ children }) => {
     refreshData,
     clearCache,
     getCacheInfo,
+    refreshSyllabusProgress, // Add this new function
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

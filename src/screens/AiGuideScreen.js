@@ -773,10 +773,10 @@ const AiGuideScreen = ({ navigation }) => {
               styles.inputContainer,
               {
                 backgroundColor: theme.card,
-                paddingBottom:
-                  Platform.OS === 'ios'
-                    ? Math.max(keyboardVisible ? 5 : insets.bottom, 8)
-                    : 8,
+                // paddingBottom:
+                //   Platform.OS === 'ios'
+                //     ? Math.max(keyboardVisible ? 5 : insets.bottom, 8)
+                //     : 8,
               },
             ]}
           >
@@ -1149,8 +1149,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     width: '100%',
     zIndex: 10, // Ensure it stays on top
-    position: 'absolute',
-    bottom: 0,
+    // position: 'absolute',
+    // bottom: 0,
     left: 0,
     right: 0,
     borderTopWidth: StyleSheet.hairlineWidth,
